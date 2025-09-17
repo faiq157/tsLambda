@@ -1,0 +1,23 @@
+
+# Yaml Files ignore
+*.yaml
+
+# Zip Files ignore
+*.zip
+
+node_modules
+
+# Windows stuff
+Thumbs.db
+Desktop.ini
+
+# Mac stuff
+.DS_Store
+
+# WebStorm stuff
+.idea
+
+*.commands
+.env*
+
+

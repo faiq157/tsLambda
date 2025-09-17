@@ -1,0 +1,56 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "pwa-node",
+      "request": "launch",
+      "name": "NC-to-DB",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "cwd": "${workspaceFolder}/NC-to-DB",
+      "env": {
+        "DEBUG": "http"
+      },
+      // "preLaunchTask": "nc-to-db-build-deb",
+      "program": "${workspaceFolder}/NC-to-DB/runner.js"      
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "NC-to-DB (Lint)",
+      "program": "${workspaceFolder}/NC-to-DB/node_modules/eslint/bin/eslint.js",
+      "args": ["./"],
+      "internalConsoleOptions": "openOnSessionStart",
+      "skipFiles": ["<node_internals>/**"],
+      "cwd": "${workspaceFolder}/NC-to-DB/",
+      "envFile": "${workspaceRoot}/NC-to-DB/.env"
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "NC-to-DB (Tests)",
+      "program": "${workspaceFolder}/NC-to-DB/node_modules/mocha/bin/_mocha",
+      "args": [
+        "-u",
+        "bdd",
+        "--timeout",
+        "60000",
+        "--colors",
+        "--reporter",
+        "mochawesome",
+        "--reporter-options",
+        "quiet=true,json=false,reportDir=.reports,reportFilename=test-result,reportTitle=\"Test-Results\",inlineAssets=true",
+        "--exit",
+        "test/*.js",
+      ],
+      "internalConsoleOptions": "openOnSessionStart",
+      "skipFiles": ["<node_internals>/**"],
+      "cwd": "${workspaceFolder}/NC-to-DB/",
+      "envFile": "${workspaceRoot}/NC-to-DB/.env"
+    }
+  ]
+}

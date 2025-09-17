@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [{
+    "label": "nc-to-db-build-deb",
+    "command": "npm run build-deb", // Could be any other shell command
+    "args": [],
+    "type": "shell",
+    "options": {
+      "cwd": "${workspaceFolder}/NC-to-DB"
+    }
+  }]
+}

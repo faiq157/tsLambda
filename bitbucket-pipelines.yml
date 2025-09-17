@@ -1,0 +1,114 @@
+definitions:
+  steps:
+    - step: &assume-oidc-role
+        oidc: true
+        name: "Assuming OIDC IAM Role"
+        script:
+          - export AWS_ROLE_ARN=arn:aws:iam::${AWS_ACCOUNT_ID}:role/oidc-role
+          - export AWS_WEB_IDENTITY_TOKEN_FILE=$(pwd)/web-identity-token
+          - echo $BITBUCKET_STEP_OIDC_TOKEN > $(pwd)/web-identity-token
+          - printenv | xargs echo export > .envs
+        artifacts:
+          - .envs
+          - web-identity-token
+
+image:
+  name: 852475575129.dkr.ecr.us-east-2.amazonaws.com/ts/base/alpine:3.0
+  aws:
+    oidc-role: arn:aws:iam::852475575129:role/oidc-role
+options:
+  max-time: 15
+pipelines:
+  pull-requests:
+     '**':
+       - step:
+          <<: *assume-oidc-role
+       - step:
+           oidc: true
+           name: Checking Lint Status
+           script:
+             - |
+               echo "node version: `node --version`"
+               echo "npm version: `npm --version`"
+             - bash $BITBUCKET_CLONE_DIR/deployment/check-lint-status.sh
+
+  custom:
+     production:
+      - step:
+          <<: *assume-oidc-role
+      - step:
+          oidc: true
+          name: Custom Deployment of Production Lambda functions
+          deployment: production
+          caches:
+            - node
+          script:
+            - source .envs
+            - bash  deployment/custom-deploy.sh
+
+     staging:
+      - step:
+          <<: *assume-oidc-role
+      - step:
+          oidc: true
+          name: Custom Deployment of Staging Terraform Lambda functions
+          deployment: staging
+          caches:
+            - node
+          script:
+            - source .envs
+            - bash  terraform/custom-deploy.sh
+
+     development:
+      - step:
+          <<: *assume-oidc-role
+      - step:
+          oidc: true
+          name: Custom Deployment of Development Terraform Lambda functions
+          deployment: development
+          caches:
+            - node
+          script:
+            - source .envs
+            - bash  terraform/custom-deploy.sh
+
+     branchCreation:
+       - variables:
+           - name: newReleaseVersion
+           - name: sourceBranch
+             default: "master"
+       - step:
+          <<: *assume-oidc-role
+       - step:
+           oidc: true
+           name: Creating Release branches
+           script:
+             - source .envs
+             - bash $BITBUCKET_CLONE_DIR/deployment/create-branches.sh
+
+  branches:
+    develop/*:
+      - step:
+          <<: *assume-oidc-role
+      - step:
+          oidc: true
+          name: Auto Deployment of Development Terraform Lambda functions
+          deployment: development
+          caches:
+            - node
+          script:
+            - source .envs
+            - bash  terraform/auto-deploy.sh
+
+    release/*:
+      - step:
+          <<: *assume-oidc-role
+      - step:
+          oidc: true
+          name: Auto Deployment of Staging Terraform Lambda functions
+          deployment: staging
+          caches:
+            - node
+          script:
+            - source .envs
+            - bash  terraform/auto-deploy.sh

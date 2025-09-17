@@ -1,0 +1,33 @@
+{
+  "name": "ml-training",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "mocha 'test/*.js' -r dotenv/config --reporter mochawesome --reporter-options quiet=true,json=false,reportDir=.reports,reportFilename=test-result,reportTitle=\"Test-Results\",inlineAssets=true --timeout 60000 --exit",
+    "run": "node runner.js",
+    "lint": "node node_modules/eslint/bin/eslint.js ./"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sns": "^3.485.0",
+    "@aws-sdk/client-sqs": "^3.485.0",
+    "config": "^3.3.12",
+    "dotenv": "^16.4.5",
+    "fs": "^0.0.1-security",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.5.44",
+    "pg": "^8.7.1",
+    "serialize-error": "^8.1.0",
+    "tz-lookup": "^6.1.21"
+  },
+  "devDependencies": {
+    "chai": "^4.3.4",
+    "dotenv": "^14.2.0",
+    "eslint": "^8.7.0",
+    "mocha": "^9.1.4",
+    "mochawesome": "^7.0.1",
+    "nock": "^13.2.2",
+    "sinon": "^17.0.1",
+    "winston": "^3.13.1"
+  }
+}

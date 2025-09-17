@@ -1,0 +1,815 @@
+syntax = "proto3";
+
+package terrasmart.cloud;
+
+import "google/protobuf/timestamp.proto";
+
+
+message AccumulatorUpdate {
+    enum UpdateType {
+        UNKNOWN = 0;
+        BATT = 1;
+        PANEL = 2; // This is actually External Input 1, but typically has a solar panel connected to it
+        MOTOR = 3;
+        ANGULAR_ERROR = 4;
+        CHARGER = 5;
+        EXTERNAL_INPUT_2 = 6; // New, became available around NC 0.6.9 STM32 1.8 and RF220 1.1. Requires Model-3 Row Boxes!
+        MOTOR_RUNTIME = 7; // New, become available around NC 0.9.0 STM 3.5
+    }
+
+    UpdateType type = 1;
+    float value = 2;
+    bool partial_data = 3; // Not implemented on NC or Cloud side
+}
+
+message TrackerControllerUpdates {
+    bytes tc_snap_addr = 1;
+    repeated AccumulatorUpdate updates = 2;
+    google.protobuf.Timestamp when = 3;
+    uint32 polls_sent = 4;
+    uint32 polls_received = 5;
+    uint32 link_quality = 6;
+    uint32 mesh_depth = 7;
+}
+
+message TrackerControllerHourUpdates {
+    TrackerControllerUpdates tc_update = 1;
+    uint32 hour = 2;
+    google.protobuf.Timestamp day = 3;
+}
+
+enum TrackingState { // These are site-wide
+    UNKNOWN = 0;
+    ESTOP = 1;
+    STOW_WEATHER = 2;
+    TRACKING_ONLY = 3;
+    TRACKING_WITH_BACKTRACKING = 4;
+    STOW_NIGHT = 5;
+    PRESET = 6;
+    TRACKING_WITH_DIFFUSE = 7;
+    REMOTE_QC = 8;
+    FLAT_MAINTENANCE = 9;
+    SNOW_SHEDDING = 10;
+}
+
+message TrackingChange {
+    TrackingState updated_state = 1;
+    google.protobuf.Timestamp state_changed_at = 2;
+    uint32 commanded_preset = 3;
+    string user_name = 4;
+    string user_email = 5;
+    string source = 6;
+}
+
+message AngleUpdate {
+    // Note that the following numbering is NOT what the Row Box and Controller use.
+    // There is a brute-force number translation done in the Controller to support these values.
+    enum TrackingStatus { // These are per-Row Box
+        UNKNOWN = 0;
+        MANUAL = 1;
+        TRACKING_ONLY = 2;
+        TRACKING_WITH_BACKTRACKING = 3;
+        LOW_BATTERY_AUTO_STOW = 4;
+        LOCAL_ESTOP = 5;
+        INDIVIDUAL_ROW_CONTROL = 6;
+        GROUP_ROW_CONTROL = 7;
+        HANDHELD_ROW_CONTROL = 8;
+        HIGH_TEMPERATURE_MOTOR_CUTOFF = 9;
+        QC_ROW_CONTROL = 10;
+        TRACKING_WITH_DIFFUSE = 11;
+        QAQC_ROW_CONTROL = 12;
+        SNOW_SHEDDING = 13;
+        AUTO_SNOW_SHEDDING = 14;
+        SNOW_SHEDDING_RETRY = 15;
+        MQC_ROW_CONTROL = 16;
+    }
+
+    float current_angle = 2;
+    float requested_angle = 3;
+    TrackingState commanded_state = 4;
+    TrackingStatus tracking_status = 5;
+    google.protobuf.Timestamp when = 6;
+    uint32 commanded_state_detail = 7;
+    uint32 panel_index = 8;
+    uint32 panel_command_state = 9;
+    float motor_current = 10;
+    float last_requested_angle = 11;
+}
+
+message RackAngles {
+    bytes tc_snap_addr = 1;
+    repeated AngleUpdate angles = 2;
+}
+
+message TrackerControllerInstantUpdates {
+    // This message is for telemetry that changes at any time instead of something we only care about on the hour or day
+    bytes tc_snap_addr = 1;
+    google.protobuf.Timestamp when = 2; // the timestamp of this report
+    uint32 status_bits = 3;
+
+    enum AssetStatus {
+        OFFLINE = 0;
+        ONLINE = 1;
+        UNDER_FCS_CONTROL = 2;
+        UNKNOWN = 3;
+        UNDER_MANUAL_CONTROL = 4;
+        UNDER_HHC_CONTROL = 5;
+        UNDER_GROUP_CONTROL = 6;
+        UNDER_QC_CONTROL = 7;
+        UNDER_QAQC_CONTROL = 8;
+        UNDER_MQC_CONTROL = 9;
+    }
+
+    AssetStatus asset_status = 4; // Indicates asset status 
+    google.protobuf.Timestamp last_reported = 5; // goes with online
+}
+
+message LogEntry {
+    enum EventType {
+        SITE_OVERVIEW      = 0;
+        NETWORK_CONTROLLER = 1;
+        INDIVIDUAL_ASSET   = 2;
+        ACCESS_CONTROL     = 3;
+        FIRMWARE_UPDATE    = 4;
+        UNKNOWN            = 5;
+        CONFIG_UPDATE      = 6;
+        UNIT_TESTING       = 7;
+        ASSET_UN_PROVISION = 8;
+        ASSET_PROVISION    = 9;
+    }
+
+    google.protobuf.Timestamp created = 1;
+    uint32 levelno = 2;
+    string logger = 3;
+    string message = 4;
+    EventType type = 5;
+}
+
+message ClearLogEntry {
+    google.protobuf.Timestamp created = 1;
+    google.protobuf.Timestamp cleared = 2;
+}
+
+message Alert {
+    enum AlertType {
+        UNKNOWN = 0;
+        ESTOP = 1;
+        ASSETS_REPORTING = 2;
+        GPS = 3;
+        CLOCK = 4;
+        MODEM = 5;
+        NTP = 6;
+    }
+
+    google.protobuf.Timestamp when = 1;
+    bool active = 2;
+    AlertType type = 3;
+    string message = 4;
+}
+
+message BatteryUpdate {
+    bytes tc_snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    float voltage = 3;
+    float current = 4;
+    float charged = 5;
+    float health = 6;
+    float batt_temp = 7;
+    float heater_temp = 8;
+    uint32 misc_status_bits = 9;
+}
+
+message PanelUpdate {
+    bytes tc_snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    // The following is technically external_input_1. Originally it always had a solar PANEL connected to it
+    float solar_voltage = 3;
+    float solar_current = 4;
+    // Starting in MODEL-3 Row Box hardware, the second power input became monitorable too
+    float external_input_2_voltage = 5;
+    float external_input_2_current = 6;
+}
+
+message WeatherUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    float wind_speed = 3;
+    float wind_direction = 4;
+    float average_wind_speed = 5;
+    float peak_wind_speed = 6;
+    float temperature = 7; // the temperature OUTSIDE as measured by the Snow Sensor
+    float snow_depth = 8;
+    sint32 increase_avg_wind_reporting = 9;
+    sint32 increase_wind_gust_reporting = 10;
+    string timestamp = 11;
+    string data_type = 12;
+}
+
+message StartUpData  {
+    google.protobuf.Timestamp when = 1;
+    string  FW_Version = 2;
+    string  NCCB_Uptime = 3;
+    string  Linux_Uptime = 4;
+    string  Application_Uptime = 5;
+}
+
+// Data that changes less often. These were introduced in NC version 0.2
+message ConfigUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    uint32 model_device = 3; // MMMMWRDD, further explanation below
+    double location_lat = 4;
+    double location_lng = 5;
+    string location_text = 6;
+    uint32 hardware_rev = 7; // 0 indicate 0.0, 10 indicates 1.0,
+    uint32 firmware_rev = 8; // 1 indicates 0.1, 11 indicates 1.1
+    string config_label  = 9;
+    uint64 config_timestamp  = 10;
+    string site_name = 11;
+    sint32 panel_horizontal_cal_angle = 12;
+    sint32 panel_min_cal_angle = 13;
+    sint32 panel_max_cal_angle = 14;
+    uint32 config_flags = 15;
+    sint32 segments_0_panel_array_width = 16;
+    sint32 segments_0_spacing_to_east = 17;
+    sint32 segments_0_spacing_to_west = 18;
+    sint32 segments_0_delta_height_east = 19;
+    sint32 segments_0_delta_height_west = 20;
+    sint32 segments_1_panel_array_width = 21;
+    sint32 segments_1_spacing_to_east = 22;
+    sint32 segments_1_spacing_to_west = 23;
+    sint32 segments_1_delta_height_east = 24;
+    sint32 segments_1_delta_height_west = 25;
+    sint32 preset_angles_0_preset_angle = 26;
+    bool preset_angles_0_nearest_enabled  = 27;
+    sint32 preset_angles_1_preset_angle  = 28;
+    bool preset_angles_1_nearest_enabled  = 29;
+    sint32 preset_angles_2_preset_angle  = 30;
+    bool preset_angles_2_nearest_enabled  = 31;
+    sint32 preset_angles_3_preset_angle  = 32;
+    bool preset_angles_3_nearest_enabled  = 33;
+    sint32 preset_angles_4_preset_angle  = 34;
+    bool preset_angles_4_nearest_enabled  = 35;
+    sint32 preset_angles_5_preset_angle  = 36;
+    bool preset_angles_5_nearest_enabled  = 37;
+    sint32 preset_angles_6_preset_angle  = 38;
+    bool preset_angles_6_nearest_enabled  = 39;
+    sint32 preset_angles_7_preset_angle  = 40;
+    bool preset_angles_7_nearest_enabled  = 41;
+    sint32 preset_angles_8_preset_angle  = 42;
+    bool preset_angles_8_nearest_enabled  = 43;
+    sint32 preset_angles_9_preset_angle = 44;
+    bool preset_angles_9_nearest_enabled  = 45;
+    sint32 preset_angles_10_preset_angle  = 46;
+    bool preset_angles_10_nearest_enabled  = 47;
+    sint32 preset_angles_11_preset_angle  = 48;
+    bool preset_angles_11_nearest_enabled  = 49;
+    sint32 preset_angles_12_preset_angle  = 50;
+    bool preset_angles_12_nearest_enabled  = 51;
+    sint32 preset_angles_13_preset_angle  = 52;
+    bool preset_angles_13_nearest_enabled  = 53;
+    sint32 preset_angles_14_preset_angle  = 54;
+    bool preset_angles_14_nearest_enabled  = 55;
+    sint32 preset_angles_15_preset_angle  = 56;
+    bool preset_angles_15_nearest_enabled  = 57;
+    float swoc_required_duration = 58;
+    float swoc_threshold = 59;
+    sint32 encoded_hard_limit_register = 60;
+    sint32 encoded_soft_limit_register = 61;
+    string battery_rev = 62;
+    string script_rev = 63;
+    string radio_rev = 64;
+    string mac_address = 65;
+    string stm_rev = 66;
+    string battery_flash_rev = 67;
+    float snow_sensor_height = 68;
+    float wind_dir_offset = 69;
+    sint32 tracking_min_angle = 70;
+    sint32 tracking_max_angle = 71;
+    sint32 dynamic_min_angle = 72;
+    sint32 dynamic_max_angle = 73;
+    uint32 simulation_flags = 74;
+    float heater_k = 75;
+    uint32 preheating_battery_threshold = 76;
+    float preheating_temperature_threshold = 77;
+    float snow_shedding_deadband_angle = 78;
+    uint32 snow_shedding_duration = 79;
+    float autoshed_temperature_threshold = 80;
+    uint32 autoshed_minutes_threshold = 81;
+    uint32 autoshed_battery_threshold = 82;
+    uint32 lbas_entry_threshold = 83;
+    uint32 lbas_exit_threshold = 84;
+    uint32 median_filter_length = 85;
+    uint32 wx_data_record_frequency = 86;
+    uint32 snow_sensor_type = 87;
+    float avg_wind_speed_correction_factor = 88;
+    float peak_wind_speed_correction_factor = 89;
+}
+
+// This message currently includes unit temperature, 
+// but it is inteded to incorporate parameters that each asset type should hold. 
+message AssetUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    float unit_temperature = 3;
+    float up_time = 4;
+}
+
+// This message contain data about the cellular connection updated on hourly basis.
+message CellUpdate {
+    bytes nc_snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    uint32 uptime = 3;
+    sint32 rssi_dbm = 4;
+}
+
+// This message contains data about the cellular connection updated on daily basis.
+message CellDailyUpdate {
+    bytes nc_snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    string imei = 3;
+    bool roaming = 4;
+    string mdn = 5;
+    string lan_ip = 6;
+    string wan_ip = 7;
+    string link_status = 8;
+    string tx_data_usage = 9;
+    string rx_data_usage = 10;
+    string tower_id = 11;
+}
+
+message WeatherStowUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    uint32 stow_type = 3;
+    float value = 4;
+    float threshold = 5;
+    float lower_threshold = 6;
+}
+
+// Message for reporting site configuration information to cloud 
+// whenever there is a change in site configurations.
+message SiteConfigUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    string site_name = 3;
+    string site_contact = 4;
+    string site_organization = 5;
+    float gps_lat = 6;
+    float gps_lng = 7;
+    float gps_alt = 8;
+    bool enable_nightly_shutdown = 9;
+    uint32 power_off = 10;
+    uint32 power_on = 11;
+    bool enable_low_power_shutdown = 12;
+    float cell_modem_warning_voltage = 13;
+    float cell_modem_cutoff_voltage = 14;
+    float cell_modem_cuton_voltage = 15;
+    float gateway_warning_voltage = 16;
+    float gateway_cutoff_voltage = 17;
+    float wind_speed_threshold = 18;
+    float wind_gust_threshold = 19;
+    float snow_depth_threshold = 20;
+    float panel_snow_depth_threshold = 21;
+    bool enable_wind_speed_stow = 22;
+    bool enable_wind_gust_stow = 23;
+    bool enable_snow_depth_stow = 24;
+    bool enable_panel_snow_depth_stow = 25;
+    uint32 minimum_stations_required = 26; 
+    float wind_speed_duration_required = 27;
+    float resume_tracking_after_wind_timeout = 28;
+    float resume_tracking_after_snow_timeout = 29;
+    float resume_tracking_after_panel_snow_timeout = 30;
+    bool enable_snow_depth_averaging = 31;
+    bool enable_panel_snow_depth_averaging = 32;
+    uint32 wind_reporting_close_percentage = 33;
+    uint32 wind_reporting_close_interval = 34;
+    uint32 wind_reporting_over_interval = 35;
+    uint32 snow_reporting_close_percentage = 36;
+    uint32 snow_reporting_close_interval = 37;
+    uint32 snow_reporting_over_interval = 38;
+    bool enable_diffuse_mode = 39;
+    float enter_diffuse_mode_duration = 40;
+    float exit_diffuse_mode_duration = 41;
+    bool enable_too_cold_to_move_stow = 42;
+    float too_cold_to_move_stow_temp_threshold = 43;
+    float too_cold_to_move_stow_temp_low_threshold = 44;
+    float resume_tracking_after_too_cold_to_move_timeout = 45;
+    bool enable_specfile_from_slui = 46;   
+    string site_type = 47;
+    bool enable_snow_shedding = 48;
+    float snow_shedding_threshold = 49;
+    float snow_shedding_duration = 50;
+    uint32 median_filter_length = 51;
+    string stow_logic = 52;
+}
+
+// message for GPS information published to cloud
+message GpsUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    float latitude = 3;
+    float longitude = 4;
+    float altitude = 5;
+    uint32 num_sats = 6;
+    uint32 quality = 7;
+    google.protobuf.Timestamp fix_time = 8;
+    bool is_responding = 9;
+    string altitude_units = 10;
+    bool is_clock_questionable = 11;
+}
+
+message AssetRadioUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    string radio_mac_addr = 3;
+    string radio_channel = 4;
+    string radio_network_id = 5;
+    string radio_firmware = 6;
+    string radio_script_version = 7;
+    string radio_script_crc = 8;
+    string radio_link_quality = 9;
+    string radio_mesh_depth = 10;
+    string radio_polls_sent = 11;
+    string radio_poll_responses = 12;
+    bool is_a_repeater = 13;
+}
+
+message ChargerUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    float voltage = 3;
+    float current = 4;
+}
+
+message AssetRestarted {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    float up_time = 3;
+}
+
+message SolarInfoUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    google.protobuf.Timestamp sunrise = 3;
+    google.protobuf.Timestamp sunset = 4;
+    string wakeup_time = 5;
+}
+
+message NetworkControllerBridgeUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    string script_version = 3;
+    string firmware_version = 4;
+}
+
+message AssetPresetChanged {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    uint32 panel_index = 3;
+    uint32 panel_command_state = 4;
+}
+
+message CommandStatusUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    uint32 command = 3;
+    uint32 status = 4;
+    uint32 error_code = 5;
+}
+
+message CloudAccuWeatherUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    bool need_accu_weather_update = 3;
+    bool accu_stow = 4;
+    string stow_type = 5;
+    string stow_start_time = 6;
+    string stow_end_time = 7;
+    uint32 error_codes = 8;
+}
+
+message MotorCurrentUpdate {
+    enum TrackingStatus { // These are per-Row Box
+        UNKNOWN = 0;
+        MANUAL = 1;
+        TRACKING_ONLY = 2;
+        TRACKING_WITH_BACKTRACKING = 3;
+        LOW_BATTERY_AUTO_STOW = 4;
+        LOCAL_ESTOP = 5;
+        INDIVIDUAL_ROW_CONTROL = 6;
+        GROUP_ROW_CONTROL = 7;
+        HANDHELD_ROW_CONTROL = 8;
+        HIGH_TEMPERATURE_MOTOR_CUTOFF = 9;
+        QC_ROW_CONTROL = 10;
+        TRACKING_WITH_DIFFUSE = 11;
+        QAQC_ROW_CONTROL = 12;
+        MQC_ROW_CONTROL = 13;
+    }
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    float peak_motor_inrush_current = 3;
+    float peak_motor_current = 4;
+    float average_motor_current = 5;
+    float ending_motor_current = 6;
+    float current_angle = 7;
+    TrackingStatus tracking_status = 8;
+}
+
+message WeatherReportingUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    bytes asset_snap_addr = 3;
+    sint32 increase_avg_wind_reporting = 4;
+    sint32 increase_wind_gust_reporting = 5;
+    sint32 increase_avg_snow_reporting = 6;
+    sint32 increase_panel_snow_reporting = 7;
+    uint32 increase_type = 8;
+    sint32 increase_flag = 9;
+    float asset_value = 10;
+    float threshold = 11;
+    uint32 close_percentage = 12;
+}
+
+
+message AssetRadioRestarted {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    float asset_radio_up_time = 3;
+}
+
+message ConfiguredVersions {
+    google.protobuf.Timestamp when = 1;
+    string nc_version = 2;
+    string nc_script_version = 3;
+    string nc_radio_version = 4;
+    string nc_stm32_version = 5;
+    string nc_gas_guage_version = 6;
+    string asset_script_version = 7;
+    string asset_radio_version = 8;
+    string asset_stm32_version = 9;
+    string asset_gas_guage_version = 10;
+}
+
+message VegetationUpdate {
+    bytes asset_snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    bool vegetation_mode_status = 3;
+    sint32 temperature_threshold = 4;
+    repeated sint32 days_history = 5;
+    repeated bytes asset_snap_addresses = 6;
+    repeated bytes newly_added_snap_addresses = 7;
+    bool is_startup_update = 8;
+    string who = 9;
+}
+
+message IrradianceUpdate {
+    google.protobuf.Timestamp when = 1;
+    float site_ghi = 2;
+    float site_poa = 3;
+}
+
+message InputVoltage {
+    float min = 1;
+    float max = 2;
+}
+
+message QaQcReportUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp timestamp = 2;
+    string stage = 3;
+    float max_peak_motor_inrush_current = 4;
+    float max_peak_motor_current = 5;
+    float max_average_motor_current = 6;
+    uint32 status_bits = 7;
+    string label = 8;
+    string user_name = 9;
+    string user_email = 10;
+    float charged = 11;
+    float min_temperature = 12;
+    float max_wind_gust = 13;
+    float max_average_wind = 14;
+    TrackingState site_mode = 15;
+    InputVoltage pv1 = 16;
+    InputVoltage pv2 = 17;
+}
+
+message IncreaseWeatherReporting {
+    google.protobuf.Timestamp when = 1;
+    bytes snap_addr = 2;
+    uint32 reporting_type = 3;
+    sint32 reporting_flag = 4;
+    float reporting_value = 5;
+    float reporting_threshold = 6;
+    uint32 close_percentage = 7;
+}
+
+message ToggleFastTrakUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    bool status = 3;
+}
+
+message SnowSheddingUpdate {
+    enum SheddingState {
+        SNOW_SHEDDING_STARTED  = 0;
+        SNOW_SHEDDING_STOPPED = 1;
+        SNOW_SHEDDING_DELAYED = 2;
+        SNOW_SHEDDING_STARTED_WITH_DELAY = 3;
+    }
+    google.protobuf.Timestamp when = 1;
+    bytes snap_addr = 2;
+    google.protobuf.Timestamp timestamp = 3;
+    float depth = 4;
+    float baseline = 5;
+    float snow_on_ground_now = 6;
+    float estimate = 7;
+    float trigger = 8;
+    float threshold = 9;
+    bool active = 10;
+    SheddingState state = 11;
+}
+
+message SnowSheddingReport {
+    enum SheddingStatus {
+        UNRESPONSIVE = 0;
+        PENDING = 1;
+        FAILED = 2;
+        RETRIED = 3;
+        COMPLETED = 4;
+    }
+
+    message Asset {
+        bytes snap_addr = 1;
+        uint32 snow_shedding_retries =  2;
+    }
+
+    SheddingStatus status = 1;
+    repeated Asset assets = 2;
+}
+
+message SnowSheddingReportUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    repeated SnowSheddingReport report = 3;
+    bool delayed = 4;
+}
+
+message FirmwareUpgradeReport {
+    string firmware = 1;
+    google.protobuf.Timestamp start_time = 2;
+    repeated string attempted = 3;
+    repeated string succeeded = 4;
+    repeated string failed = 5;
+}
+
+message FirmwareUpgradeReportUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    FirmwareUpgradeReport report = 3;
+    bool finished = 4;
+}
+
+message SiteParameters {
+    bool enable_nightly_shutdown = 1;
+    bool enable_nightly_restart = 2;
+    bool tracking_enable = 3;
+    bool enable_cpu_logging = 4;
+    bool enable_weather_data_recording = 5;
+    bool include_sunrise_with_nightly_stow = 6;
+    bool mqtt_enabled = 7;
+    bool enable_movement_prediction = 8;
+    bool enable_low_power_shutdown = 9;
+    bool backtracking_enable = 10;
+    bool enable_mem_logging = 11;
+    uint32 power_off = 12;
+    uint32 power_on = 13;
+    uint32 restart_before_sunrise = 14;
+    uint32 rqc_response_timeout = 15;
+    uint32 rqc_batch_size = 16;
+    uint32 operational_mode = 17;
+    uint32 cpu_threshold = 18;
+    uint32 stow_avg_duration = 19;
+    uint32 mem_threshold = 20;
+    float site_image_ul_lat = 21;
+    float site_image_ul_lng = 22;
+    float site_image_ll_lat = 23;
+    float site_image_ll_lng = 24;
+    float gps_alt = 25;
+    float gps_lat = 26;
+    float gps_lng = 27;
+    float gateway_cutoff_voltage = 28;
+    float cell_modem_cuton_voltage = 29;
+    float cell_modem_warning_voltage = 30;
+    float cell_modem_cutoff_voltage = 31;
+    float gateway_warning_voltage = 32;
+    string site_name = 33;
+    string site_organization = 34;
+    string site_contact = 35;
+    string site_type = 36;
+    string site_image = 37;
+    string previous_stow_logic = 38;
+    string stow_logic = 39;
+}
+
+message WeatherParameters {
+    bool trigger_averaging = 1;
+    bool enable_wind_speed_stow = 2;
+    bool enable_wind_gust_stow = 3;
+    bool enable_snow_depth_stow = 4;
+    bool enable_snow_depth_averaging = 5;
+    bool enable_auto_resume_tracking_snow = 6;
+    bool enable_panel_snow_depth_stow = 7;
+    bool enable_panel_snow_depth_averaging = 8;
+    bool enable_auto_resume_tracking_panel_snow = 9;
+    bool enable_diffuse_mode = 10;
+    bool enable_too_cold_to_move_stow = 11;
+    bool enable_snow_shedding = 12;
+    bool enable_vegetation_mode = 13;
+    float wind_speed_threshold = 14;
+    float wind_speed_duration_required = 15;
+    float wind_gust_threshold = 16;
+    float resume_tracking_after_wind_timeout = 17;
+    float resume_tracking_after_snow_timeout = 18;
+    float resume_tracking_after_panel_snow_timeout = 19;
+    float snow_depth_threshold = 20;
+    float snow_depth_low_threshold = 21;
+    float panel_snow_depth_threshold = 22;
+    float panel_snow_depth_low_threshold = 23;
+    float too_cold_to_move_stow_temp_threshold = 34;
+    float too_cold_to_move_stow_temp_low_threshold = 35;
+    float resume_tracking_after_too_cold_to_move_timeout = 36;
+    float vegetation_temperature_threshold = 27;
+    float snow_shedding_threshold = 28;
+    uint32 minimum_stations_required = 29;
+    uint32 enter_diffuse_mode_duration_required = 30;
+    uint32 snow_shedding_duration = 31;
+    uint32 snow_depth_median_filter_length = 32;
+    uint32 exit_diffuse_mode_duration_required = 33;
+}
+
+message NCParametersUpdate {
+    bytes snap_addr = 1;
+    google.protobuf.Timestamp when = 2;
+    SiteParameters site_params = 3;
+    WeatherParameters weather_params = 4;
+}
+
+//
+// model_device byte has a lot packed into it. Total format is MMMMWRDD (binary)
+// MMMM - upper 4 bits is the model number minus 1. 0 to 15 map to models 1 to 16
+// Originally all products were Model 1, typically shown as trailing "-1" suffix
+// The cost-reduced (de-populated or "de-pop") Row Boxes were the first Model 2 hardware.
+// Model 3 Row Boxes now exist. These are similar to a "de-pop" but some parts have been added back in.
+// A Model-3 Row Box can monitor the voltage and current of the second external power input.
+// W - single bit that is set if the device has weather sensors. Might not be a Weather Station!
+// R - single bit that is set if the device has row control motor. To date, only set for true Row Controllers.
+// DD - values 0 - 3, indicating 0: Row Controller 1: Network Controller 2: Weather Station 3: Future/Reserved
+
+
+message CloudUpdates {
+    bytes nc_snap_addr = 1;
+    repeated TrackingChange tracking_changes = 2;
+    repeated TrackerControllerHourUpdates tc_hour_updates = 3;
+    repeated TrackerControllerUpdates tc_day_updates = 4;
+    repeated RackAngles rack_angles = 5;
+    repeated TrackerControllerInstantUpdates tc_updates = 6;
+    repeated LogEntry log_entries = 7;
+    repeated ClearLogEntry clear_log_entries = 8;
+    repeated Alert active_alerts = 9;
+    repeated Alert alert_updates = 10;
+    repeated BatteryUpdate battery_updates = 11;
+    repeated WeatherUpdate weather_updates = 12;
+    repeated ConfigUpdate config_updates = 13;
+    repeated AssetUpdate asset_updates = 14;
+    CellUpdate cell_updates = 15;
+    CellDailyUpdate cell_daily_updates = 16;
+    repeated PanelUpdate panel_update = 17;
+    repeated StartUpData start_up_data = 18;
+    WeatherStowUpdate weather_stow_updates = 19;
+    GpsUpdate gps_updates = 20;
+    repeated AssetRadioUpdate asset_radio_updates = 21;
+    SiteConfigUpdate site_config_updates = 22;
+    repeated ChargerUpdate charger_updates = 23;
+    AssetRestarted asset_restarted = 24;
+    SolarInfoUpdate solar_info_updates = 25;
+    NetworkControllerBridgeUpdate bridge_updates = 26;
+    AssetPresetChanged asset_preset_changed = 27;
+    CommandStatusUpdate command_status = 28;
+    MotorCurrentUpdate motor_current_update = 29;
+    WeatherReportingUpdate weather_reporting_update = 30;
+    ConfiguredVersions configured_versions = 31;
+    AssetRadioRestarted asset_radio_restarted = 32;
+    CloudAccuWeatherUpdate cloud_accu_weather_update = 33;
+    VegetationUpdate vegetation_update = 34;
+    IrradianceUpdate irradiance_update = 35;
+    QaQcReportUpdate qaqc_report_update = 36;
+    IncreaseWeatherReporting increase_weather_reporting = 37;
+    ToggleFastTrakUpdate toggle_fast_trak_update = 38;
+    SnowSheddingUpdate snow_shedding_update = 39;
+    SnowSheddingReportUpdate snow_shedding_report_update = 40;
+    FirmwareUpgradeReportUpdate firmware_upgrade_report_update = 41;
+    NCParametersUpdate nc_params_update = 42;
+}
+
+// protoc.exe --python_out=..\netcontrol --js_out=import_style=commonjs,binary:C:\firia\ts-cloud-backend\lambdas\NC-to-DB\ .\terrasmart_cloud.proto
