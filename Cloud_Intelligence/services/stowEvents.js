@@ -1,17 +1,13 @@
 const db = require("../db");
 const { getPgTimestamp, getOldTime } = require("../utils/libs/functions");
-const { pgConfig } = require("../pg");
-
-const client = new Client(pgConfig);
+const { exeQuery } = require("../pg");
 
 // Number of hours for which if there is no change in data send notifications
 const hours = 8;
 
 class StowEvents {
-  constructor(client, ncId) {
-    // pg reader instance to query for data
-    this.client = client;
-    // Id of Network COntroller the Weather Station is connected
+  constructor(ncId) {
+    // Id of Network Controller the Weather Station is connected
     this.ncId = ncId;
     this.stowData = null;
   }
@@ -20,7 +16,7 @@ class StowEvents {
 
   async getStowEvents() {
     const query = db.getStowEvents;
-    const result = await this.client.query(query, [this.ncId, this.ncSleep]);
+    const result = await exeQuery(query, [this.ncId, this.ncSleep]);
     console.log("Got NC WakeUp data: ", result.rows);
 
     if (!result.rows.length) throw new Error("NC is Still Asleep");
@@ -29,4 +25,4 @@ class StowEvents {
   }
 }
 
-const o = new StowEvents(client, "f53bfad9-d31f-46bf-b9e6-9fd66c42ee22");
+const o = new StowEvents("f53bfad9-d31f-46bf-b9e6-9fd66c42ee22");

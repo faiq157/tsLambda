@@ -8,11 +8,10 @@ const { getS3EmailAssetsUrl, formatUserFriendlyTime } = require("../utils/libs/f
 const { notificationSettingService } = require("./notificationSettingService");
 const { notificationService } = require("./common/notificationService");
 const { acquireLock } = require("../utils/libs/execSync");
+const { exeQuery } = require("../pg");
 class WeatherStowService {
-  async handler(client, pgWrite, payload) {
+  async handler(payload) {
     //console.log("WeatherStowService handler!!!");
-    this.client = client;
-    this.pgWrite = pgWrite;
     this.payload = payload;
     try {
       return await this.processEvent();
@@ -133,7 +132,7 @@ class WeatherStowService {
       const deviceType = await this.getDeviceType();
       this.device_type = deviceType;
       console.log(this.getAssetAndSiteInfoQuery(), [this.payload.asset_id]);
-      const assetInfoRes = await this.client.query(this.getAssetAndSiteInfoQuery(), [this.payload.asset_id]);
+      const assetInfoRes = await exeQuery(this.getAssetAndSiteInfoQuery(), [this.payload.asset_id]);
       if (assetInfoRes.rows.length > 0) {
         let data = assetInfoRes.rows[0];
         this.weather_forecast_stow_after_time = data.weather_forecast_stow_after_time;
@@ -203,7 +202,7 @@ class WeatherStowService {
     console.log('getSiteLayoutInfo');
     try {
       //get site_layout info
-      let siteLayoutInfoRes = await this.client.query(
+      let siteLayoutInfoRes = await exeQuery(
         db.siteLayoutInfoByAssetId,
         [this.payload.asset_id]
       );
@@ -230,7 +229,7 @@ class WeatherStowService {
     console.log('getDeviceType')
     try {
       let deviceType = null;
-      const getDeviceTypeInfoRes = await this.client.query(db.deviceTypeInfoQuery, [this.payload.device_type_id])
+      const getDeviceTypeInfoRes = await exeQuery(db.deviceTypeInfoQuery, [this.payload.device_type_id])
       if (getDeviceTypeInfoRes.rows.length > 0) {
         deviceType = getDeviceTypeInfoRes.rows[0].device_type;
       }
@@ -247,9 +246,9 @@ class WeatherStowService {
   async clearCloudAlert(alertId) {
     console.log("Delete Cloud Alert: ", alertId);
     // remove entries from cloud alert detail table then proceed
-    const detailRemoveRes = await this.pgWrite.query(db.removeCloudAlertDetail, [alertId]);
+    const detailRemoveRes = await exeQuery(db.removeCloudAlertDetail, [alertId], { writer: true });
     console.log("DetailRemoveRes ", detailRemoveRes);
-    return await this.pgWrite.query(db.removeCloudAlert, [alertId]);
+    return await exeQuery(db.removeCloudAlert, [alertId], { writer: true });
   }
 
   async addCloudAlert(type, assetIdsWithActiveAlerts) {
@@ -266,7 +265,7 @@ class WeatherStowService {
         this.getEventIcon(type),
         this.getCloudAlertParams()
       ]);
-      let addcloudAlertResult = await this.pgWrite.query(db.addCloudAlertParamsByReturnId, [
+      let addcloudAlertResult = await exeQuery(db.addCloudAlertParamsByReturnId, [
         this.getEventName(type),
         this.getEventMessage(type),
         new Date(this.payload.timestamp),
@@ -276,7 +275,7 @@ class WeatherStowService {
         this.getEventTitle(type),
         this.getEventIcon(type),
         this.getCloudAlertParams()
-      ]);
+      ], { writer: true });
       console.log('addcloudAlertResult ', addcloudAlertResult);
       const cloudAlertId = addcloudAlertResult.rows[0].id;
       return await this.addCloudAlertDetails(cloudAlertId, assetIdsWithActiveAlerts);
@@ -292,14 +291,14 @@ class WeatherStowService {
   async updateCloudAlert(type, activeAlert) {
     console.log(`updateCloudAlert ${type}. activeAlert`, activeAlert);
     try {
-      let updatecloudAlertResult = await this.pgWrite.query(db.updateActiveAlertParams, [
+      let updatecloudAlertResult = await exeQuery(db.updateActiveAlertParams, [
         this.getEventMessage(type),
         activeAlert.created, //new Date(this.payload.timestamp),
         this.getEventTitle(type),
         this.getEventIcon(type),
         this.getCloudAlertParams(),
         activeAlert.id
-      ]);
+      ], { writer: true });
       console.log('updatecloudAlertResult ', updatecloudAlertResult);
       return;
     } catch (err) {
@@ -329,7 +328,7 @@ class WeatherStowService {
           counter++
         });
         console.log(cloudAlertQuery);
-        const addAlertDetailRes = await this.pgWrite.query(cloudAlertQuery, [this.payload.timestamp])
+        const addAlertDetailRes = await exeQuery(cloudAlertQuery, [this.payload.timestamp], { writer: true })
         console.log(`addAlertDetailRes `, addAlertDetailRes);
       } else {
         console.log('No assets found with active alerts')
@@ -347,7 +346,7 @@ class WeatherStowService {
   async addCloudEventLog(type, assetsWithActiveAlerts) {
     console.log(`addCloudEventLog(${type},${assetsWithActiveAlerts.rows})`);
     try {
-      let addcloudEventLogResult = await this.pgWrite.query(db.addCloudEventLogByReturnId, [
+      let addcloudEventLogResult = await exeQuery(db.addCloudEventLogByReturnId, [
         this.getEventName(type),
         this.getEventMessage(type),
         20,
@@ -356,7 +355,7 @@ class WeatherStowService {
         2,
         this.getEventTitle(type),
         this.getEventIcon(type),
-      ]);
+      ], { writer: true });
       console.log(`addcloudEventLogResult ${addcloudEventLogResult}`);
       const cloudEventLogId = addcloudEventLogResult.rows[0].id;
       if (this.payload.stow_type <= 20) {
@@ -392,7 +391,7 @@ class WeatherStowService {
           counter++
         });
         // console.log(query);
-        const addEventDetailRes = await this.pgWrite.query(query)
+        const addEventDetailRes = await exeQuery(query, [], { writer: true })
         console.log(`addEventDetailRes ${addEventDetailRes}`);
       } else {
         console.log('No assets found with active alerts')
@@ -410,7 +409,7 @@ class WeatherStowService {
   async getActiveAlert(type) {
     try {
       console.log("getActiveAlert ", type);
-      const alertRes = await this.client.query(db.getLastCloudAlertQuery,
+      const alertRes = await exeQuery(db.getLastCloudAlertQuery,
         [this.getAlertCheckEventName(type), this.payload.asset_id]);
       // console.log(`alertRes `, alertRes)
       return alertRes.rows;
@@ -425,12 +424,12 @@ class WeatherStowService {
     try {
       console.log("getActiveAlertByNCId ", type, network_controller_id);
       if (type === 25) { //defined type 25 for this query as this will only be received from NC
-        const alertRes = await this.client.query(db.getcloudAlertQueryForNC,
+        const alertRes = await exeQuery(db.getcloudAlertQueryForNC,
           [this.getAlertCheckEventName(type), network_controller_id]);
         // console.log('alertRes ', alertRes);
         return alertRes.rows;
       } else {
-        const alertRes = await this.client.query(db.getcloudAlertQueryByNCId,
+        const alertRes = await exeQuery(db.getcloudAlertQueryByNCId,
           [this.getAlertCheckEventName(type), network_controller_id]);
         // console.log('alertRes ', alertRes);
         return alertRes.rows;
@@ -447,7 +446,7 @@ class WeatherStowService {
     console.log('getAssetsIdWithActiveAlerts ')
     try {
       // console.log('QUERY: ', db.getAssetIdsWithActiveAlertsQuery, [this.network_controller_asset_id]);
-      const assetsWithActiveAlertsRes = await this.client.query(db.getAssetIdsWithActiveAlertsQuery, [this.network_controller_asset_id]);
+      const assetsWithActiveAlertsRes = await exeQuery(db.getAssetIdsWithActiveAlertsQuery, [this.network_controller_asset_id]);
       // console.log(`assetsWithActiveAlertsRes `, assetsWithActiveAlertsRes.rows);
       return assetsWithActiveAlertsRes.rows;
     } catch (err) {
@@ -1099,7 +1098,7 @@ class WeatherStowService {
   }
 
   async getAccuWeatherStowInfo() {
-    let site_stow_info = await this.client.query(this.getStowInfoQueryForStowType(this.payload.stow_type), [this.payload.asset_id]);
+    let site_stow_info = await exeQuery(this.getStowInfoQueryForStowType(this.payload.stow_type), [this.payload.asset_id]);
     if (site_stow_info == null || site_stow_info.rows.length == 0) {
       console.log("Failed to get accuWeather stow_info", site_stow_info);
       return false;

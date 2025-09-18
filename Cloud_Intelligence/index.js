@@ -110,7 +110,7 @@ const processElasticSearchData = async (payload) => {
         break;
       case "weather_stow_updates":
         if (await checkActiveAsset(client, payload)) {
-          await weatherStowService.handler(client, pgWrite, payload);
+          await weatherStowService.handler(payload);
         }
         break;
       case "network_controller_reboot_event":
