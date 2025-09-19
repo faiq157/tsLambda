@@ -2,6 +2,7 @@ const aws_integration = require("../aws_integration");
 const moment = require("moment-timezone");
 const tzlookup = require("tz-lookup");
 const db = require("../db");
+const { exeQuery } = require("../pg");
 const Handlebars = require("handlebars");
 const utils = require("../utils");
 const { addFullCloudEventLog } = require("../models/cloudEventLog.model");
@@ -11,11 +12,9 @@ const { getActiveAlertByAssetId, removeCloudAlert, addCloudAlert } = require("..
 var unflatten = require('flat').unflatten;
 
 class SnowSheddingService {
-  async handler(client, pgWrite, payload) {
+  async handler(payload) {
 
     console.log("SnowSheddingService handler!!!");
-    this.client = client;
-    this.pgWrite = pgWrite;
     this.payload = unflatten(payload);
     try {
       console.log('payload: ', this.payload);
@@ -34,13 +33,12 @@ class SnowSheddingService {
 
       //check cloud alert if exists 
       //if not then add 
-      const activeAlert = await getActiveAlertByAssetId(this.client, this.payload.nc_asset_id, 'SNOW_SHEDDING_DELAY');
+      const activeAlert = await getActiveAlertByAssetId(null, this.payload.nc_asset_id, 'SNOW_SHEDDING_DELAY');
       if (!activeAlert) {
 
         if (this.payload.snow_shedding.state === 2) {
           //add alert 
           await addCloudAlert(
-            this.pgWrite,
             this.payload.nc_asset_id,
             'SNOW_SHEDDING_DELAY',
             this.payload.timestamp,
@@ -51,7 +49,6 @@ class SnowSheddingService {
           //add timeline event 
 
           await addFullCloudEventLog(
-            this.pgWrite,
             this.payload.nc_asset_id,
             20,
             this.payload.timestamp,
@@ -72,7 +69,7 @@ class SnowSheddingService {
       } else {
         //clear alert
         if (this.payload.snow_shedding.state !== 2)
-          await removeCloudAlert(this.pgWrite, activeAlert.id);
+          await removeCloudAlert(null, activeAlert.id);
       }
     } catch (err) {
       console.error(err);
@@ -87,7 +84,7 @@ class SnowSheddingService {
   async getUpdateMeta() {
     let info = {};
     try {
-      const network_controller_info = await this.client.query(db.ncInfo, [
+      const network_controller_info = await exeQuery(db.ncInfo, [
         this.payload.network_controller_id,
       ]);
       if (network_controller_info.rows.length !== 0) {
@@ -108,7 +105,7 @@ class SnowSheddingService {
         info.exit_diffuse_mode_duration = data.exit_diffuse_mode_duration;
       }
       console.log(info);
-      info.multipleSites = await notificationService.checkProjectSites(this.client, info.project_id);
+      info.multipleSites = await notificationService.checkProjectSites(info.project_id);
       console.log("Meta ", info);
     } catch (err) {
       console.error(err);
@@ -139,7 +136,6 @@ class SnowSheddingService {
       //Notification accounts
       let notificationType = "snow_shedding_report";
       var userAccounts = await notificationSettingService.getAccounts(
-        this.client,
         info.site_id,
         notificationType
       );

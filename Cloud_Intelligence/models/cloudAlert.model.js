@@ -10,8 +10,8 @@ const getActiveAlert = async (client, snapAddr, eventName) => {
 
     return null;
 }
-const getActiveAlertByAssetId = async (client, assetId, eventName) => {
-    const { rows } = await pg.getCloudAlert(client, assetId, eventName);
+const getActiveAlertByAssetId = async ( assetId, eventName) => {
+    const { rows } = await pg.getCloudAlert(assetId, eventName);
     if (rows.length > 0) {
         return rows[0];
     }

@@ -442,7 +442,6 @@ module.exports.getCloudAlertById = (alertId) => {
 }
 
 module.exports.getActiveAlert = (
-  client,
   snapAddr,
   eventName
 ) => {
@@ -450,9 +449,9 @@ module.exports.getActiveAlert = (
   SELECT cloud_alert.* FROM terrasmart.cloud_alert
                 INNER JOIN terrasmart.asset on asset.id = cloud_alert.asset_id
                 WHERE asset.snap_addr = $1 :: VARCHAR AND event_name = $2 :: VARCHAR AND cloud_alert.active = true`;
-  return client.query(query, [snapAddr, eventName]);
+  return exeQuery(query, [snapAddr, eventName]);
 }
-module.exports.getCloudEventByNameAndTime = (client, assetId, eventName, timestamp) => {
+module.exports.getCloudEventByNameAndTime = (assetId, eventName, timestamp) => {
 
   const query = `
   SELECT * FROM terrasmart.cloud_event_log 
@@ -463,7 +462,7 @@ module.exports.getCloudEventByNameAndTime = (client, assetId, eventName, timesta
     eventName,
     timestamp,
   ]);
-  return client.query(query, [
+  return exeQuery(query, [
     assetId,
     eventName,
     timestamp,
@@ -472,7 +471,6 @@ module.exports.getCloudEventByNameAndTime = (client, assetId, eventName, timesta
 }
 
 module.exports.getCloudAlertSiteModeHist = (
-  client,
   networkControllerId
 ) => {
   const query = `
@@ -484,11 +482,10 @@ module.exports.getCloudAlertSiteModeHist = (
         AND tracking_enable = true
         AND backtracking_enable = true
         AND "timestamp" > NOW() - INTERVAL '30 seconds'`;
-  return client.query(query, [networkControllerId]);
+  return exeQuery(query, [networkControllerId]);
 }
 
 module.exports.getCloudAlertSiteModeHistWithOptMode = (
-  client,
   networkControllerId,
   cmdStateDetail
 ) => {
@@ -502,16 +499,15 @@ module.exports.getCloudAlertSiteModeHistWithOptMode = (
         AND tracking_enable = false
         AND backtracking_enable = false
         AND "timestamp" > NOW() - INTERVAL '30 seconds'`;
-  return client.query(query, [networkControllerId, cmdStateDetail]);
+  return exeQuery(query, [networkControllerId, cmdStateDetail]);
 }
 
-module.exports.updateCloudAlertSiteModeHist = (client, id) => {
+module.exports.updateCloudAlertSiteModeHist = (id) => {
   const query = `UPDATE terrasmart.cloud_alert_site_mode_hist SET is_changed = true WHERE id = $1::UUID`
-  return client.query(query, [id]);
+  return exeQuery(query, [id]);
 }
 
 module.exports.getCloudSiteModeHist = (
-  client,
   networkControllerId
 ) => {
   const query = `
@@ -523,31 +519,30 @@ module.exports.getCloudSiteModeHist = (
         AND tracking_enable = true
         AND backtracking_enable = true
         AND "timestamp" > NOW() - INTERVAL '30 seconds'`;
-  return client.query(query, [networkControllerId]);
+  return exeQuery(query, [networkControllerId]);
 }
 
-module.exports.getActiveWeatherForecastStowBySiteId = async (client, siteId, stowType, active) => {
+module.exports.getActiveWeatherForecastStowBySiteId = async (siteId, stowType, active) => {
   const query = `
     select * from terrasmart.weather_forecast_stow
     where site_id = $1 and stow_type = $2 and active = $3
   `;
-  return client.query(query, [siteId, stowType, active])
+  return exeQuery(query, [siteId, stowType, active])
 };
 
-module.exports.getWeatherCurrentConditionsByProjectID = (client, project_id) => {
+module.exports.getWeatherCurrentConditionsByProjectID = (project_id) => {
   const query = `SELECT * FROM terrasmart.weather_current_conditions WHERE project_id = $1::uuid order by timestamp desc limit 1`;
-  return client.query(query, [project_id]);
+  return exeQuery(query, [project_id]);
 };
 
-module.exports.updateWeatherForecastStow = async (pgWrite, siteId, stowType, args) => {
+module.exports.updateWeatherForecastStow = async (siteId, stowType, args) => {
   let { query, values } = getKeysAndValues(args, "update");
   values = [...values, siteId, stowType];
   const q = `UPDATE terrasmart.weather_forecast_stow SET ${query} WHERE site_id=$${values.length -1} AND stow_type = $${values.length} RETURNING *`;
-  return pgWrite.query(q, values);
+  return exeQuery(q, values);
 };
 
 module.exports.getCloudSiteModeHistWithOptMode = (
-  client,
   networkControllerId,
   cmdStateDetail
 ) => {
@@ -561,15 +556,14 @@ module.exports.getCloudSiteModeHistWithOptMode = (
         AND backtracking_enable = false
         AND operational_mode = $2::INT
         AND "timestamp" > NOW() - INTERVAL '30 seconds'`;
-  return client.query(query, [networkControllerId, cmdStateDetail]);
+  return exeQuery(query, [networkControllerId, cmdStateDetail]);
 }
 
-module.exports.updateCloudSiteModeHist = (client, id) => {
+module.exports.updateCloudSiteModeHist = (id) => {
   const query = `UPDATE terrasmart.cloud_site_mode_hist SET is_changed = true WHERE id = $1::UUID`
-  return client.query(query, [id]);
+  return exeQuery(query, [id]);
 }
 module.exports.addCloudEventLogWithUserInfo = (
-  client,
   assetId,
   eventName,
   timestamp,
@@ -586,7 +580,7 @@ module.exports.addCloudEventLogWithUserInfo = (
     RETURNING id AS id
   )
   SELECT id FROM cloud_event_log_insert`;
-  return client.query(query, [
+  return exeQuery(query, [
     eventName,
     null,
     levelNo,
@@ -628,8 +622,7 @@ module.exports.addCloudEventLog = (
   ]);
 }
 
-module.exports.addCloudEventLogDetail = (
-  client,
+module.exports.addCloudEventLogDetail = (             
   assetId,
   eventName,
   timestamp,

@@ -277,7 +277,7 @@ var event = {
       receiptHandle:
         "AQEBPppJVgl3rXkQ6tbbLSeopsVj2CTEU+eOxyd+FjCIcNHEMabXShmnM3M8FKX/wlAiDyLISRfrZ2EDDYAC9LNvP85xsdlMOFwyKsAMq0IfUdqDVg/e6Hk9skR/jSU9fMQ+bqWlssq7u65Q9AAHY8vXmZQ/AuxjtQdUhZ2ns7CBIRYgAYtuoGnXIo9YAIPencHBr6cPVhPcFjpuuoS/T7Boveo8Mhx6Yl9wBya9sabhiMtWAm9gpqWuu7v7FXxU1jTh83kGn9kLfqk1ACluYvaPoiGiJFGyY/T6SLrEx32axU7L4cVa5bXDsKA/vRoTbtzHIAnddRbaSF+eRyHy0KZ99gTzURYXtoASKSh7dtQPStw24kG9LcKs/MbDYdV0u0QiKnHM5lNmQSezgvh9yoGWwQ==",
       Sns: {
-        Message:
+        Message: '{"snap_addr": "13b51c","timestamp": "2021-07-06T11:10:33.908Z","nc_id": "6bb3ced8-b9f1-455b-bc6e-aa4f9168b8ee","modeStatus": true,"temperature_threshold":50,"daysHist":[50,45,60],"type": "elastic_search-1", "channel": "vegetation_update"}'
         // '{"channel":"battery_hist","asset_id":"00000000-0000-0000-0000-0000001bebe7","snap_addr":"1bebe7","timestamp":"2023-11-16T18:53:06.408Z","current":0.019999999552965164,"voltage":13.899999618530273,"poc":20,"poh":100,"battery_temperature":66.5,"heater_temperature":68.30000305175781,"type":"elastic_search-1","channel":"battery_hist"}',
           //"{'snap_addr': '13b51c','timestamp': '2021-07-06T11:10:33.908Z','nc_id': '8ea65d78-6e75-4b22-be07-16b81e72be0b','modeStatus': true,'temperature_threshold':50,'daysHist':[50,45,60],'type': 'elastic_search-1', 'channel': 'vegetation_update'}"
           // '{"snap_addr": "13b51c","timestamp": "2021-07-06T11:10:33.908Z","nc_id": "6bb3ced8-b9f1-455b-bc6e-aa4f9168b8ee","modeStatus": true,"temperature_threshold":50,"daysHist":[50,45,60],"type": "elastic_search-1", "channel": "vegetation_update"}'

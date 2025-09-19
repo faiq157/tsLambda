@@ -2,6 +2,7 @@ const aws_integration = require("../aws_integration");
 const moment = require("moment-timezone");
 const tzlookup = require("tz-lookup");
 const db = require("../db");
+const { exeQuery } = require("../pg");
 const Handlebars = require("handlebars");
 const utils = require("../utils");
 const { getS3EmailAssetsUrl } = require("../utils/libs/functions");
@@ -11,11 +12,9 @@ const { notificationService } = require("./common/notificationService");
 const functions = require("../utils/libs/groupedEventsHelperFunctions");
 var unflatten = require('flat').unflatten;
 class SnowSheddingReportService {
-  async handler(client, pgWrite, payload) {
+  async handler(payload) {
 
     console.log("SnowSheddingReportService handler:", payload);
-    this.client = client;
-    this.pgWrite = pgWrite;
     this.payload = unflatten(payload);
     try {
       return await this.processEvent();
@@ -37,7 +36,6 @@ class SnowSheddingReportService {
       let title = reportDetail.snow_shedding_report.delayed === true ? 'Delayed Snow Shed Report' : 'Snow Shedding Report';
 
       await addFullCloudEventLog(
-        this.pgWrite,
         this.payload.asset_id,
         20,
         this.payload.timestamp,
@@ -72,7 +70,7 @@ class SnowSheddingReportService {
   async getUpdateMeta() {
     let info = {};
     try {
-      const network_controller_info = await this.client.query(db.ncInfo, [
+      const network_controller_info = await exeQuery(db.ncInfo, [
         this.payload.network_controller_id,
       ]);
       if (network_controller_info.rows.length !== 0) {
@@ -92,7 +90,7 @@ class SnowSheddingReportService {
         info.enter_diffuse_mode_duration = data.enter_diffuse_mode_duration;
         info.exit_diffuse_mode_duration = data.exit_diffuse_mode_duration;
       }
-      info.multipleSites = await notificationService.checkProjectSites(this.client, info.project_id);
+      info.multipleSites = await notificationService.checkProjectSites(info.project_id);
     } catch (err) {
       console.error(err);
       throw new Error("Operation not completed error getUpdateMeta..!!", err);
@@ -121,7 +119,6 @@ class SnowSheddingReportService {
       //Notification accounts
       let notificationType = "snow_shedding_report";
       var userAccounts = await notificationSettingService.getAccounts(
-        this.client,
         info.site_id,
         notificationType
       );

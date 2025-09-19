@@ -136,7 +136,7 @@ const processElasticSearchData = async (payload) => {
         }
         break;
       case "vegetation_update":
-        await vegetationAlertService.handler(client, pgWrite, payload);
+        await vegetationAlertService.handler(payload);
         break;
       case "machine_learning":
         if (await checkActiveAsset(client, payload)) {
@@ -153,10 +153,10 @@ const processElasticSearchData = async (payload) => {
         await remoteQCReportService.handler(client, pgWrite, payload);
         break;
       case "snow_shedding_report":
-        await snowSheddingReportService.handler(client, pgWrite, payload);
+        await snowSheddingReportService.handler(payload);
         break;
       case "snow_shedding":
-        await snowSheddingService.handler(client, pgWrite, payload);
+        await snowSheddingService.handler(payload);
         break;
       case "increase_weather_reporting_update":
         await increaseWeatherReportingService.handler(client, pgWrite, payload);

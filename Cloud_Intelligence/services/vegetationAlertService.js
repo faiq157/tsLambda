@@ -2,6 +2,7 @@ const aws_integration = require("../aws_integration");
 const moment = require("moment-timezone");
 const tzlookup = require("tz-lookup");
 const db = require("../db");
+const { exeQuery } = require("../pg");
 var Handlebars = require("handlebars");
 const utils = require("../utils");
 const { getS3EmailAssetsUrl } = require("../utils/libs/functions");
@@ -9,10 +10,8 @@ const { cloudAlertService } = require("./cloudAlertService");
 const { notificationSettingService } = require("./notificationSettingService");
 const { notificationService } = require("../services/common/notificationService");
 class VegetationAlertService {
-  async handler(client, pgWrite, payload) {
+  async handler(payload) {
     console.log("VegetationAlertService handler!!!");
-    this.client = client;
-    this.pgWrite = pgWrite;
     this.payload = payload;
     try {
       return await this.processEvent();
@@ -88,9 +87,9 @@ class VegetationAlertService {
       const deviceType = await this.getDeviceType();
       let assetInfoRes = null;
       if (deviceType === "Network Controller") {
-        assetInfoRes = await this.client.query(this.getNCAndSiteInfoQuery(), [this.payload.nc_id]);
+        assetInfoRes = await exeQuery(this.getNCAndSiteInfoQuery(), [this.payload.nc_id]);
       } else {
-        assetInfoRes = await this.client.query(this.getAssetAndSiteInfoQuery(), [this.payload.snap_addr]);
+        assetInfoRes = await exeQuery(this.getAssetAndSiteInfoQuery(), [this.payload.snap_addr]);
       }
       if (assetInfoRes && assetInfoRes.rows.length > 0) {
         let data = assetInfoRes.rows[0];
@@ -109,7 +108,7 @@ class VegetationAlertService {
         this.payload.asset_name = data.asset_name;
         this.asset_name = await this.getAssetName();
         this.snap_addr = this.payload.snap_addr;
-        this.multipleSites = await notificationService.checkProjectSites(this.client, this.project_id);
+        this.multipleSites = await notificationService.checkProjectSites(this.project_id);
 
 
         console.log(`ASSETINFO: [asset_id:${this.payload.asset_id}] [nc_id: ${this.network_controller_id}] [nc_name: ${this.network_controller_name}] [is_notify: ${this.is_notify}] [snap_addr: ${this.snap_addr}] [asset_name: ${this.asset_name}]`);
@@ -130,7 +129,7 @@ class VegetationAlertService {
     try {
       let deviceType = null;
       console.log(db.deviceTypeInfoQueryBySnapAddr, [this.payload.snap_addr]);
-      const getDeviceTypeInfoRes = await this.client.query(db.deviceTypeInfoQueryBySnapAddr, [this.payload.snap_addr])
+      const getDeviceTypeInfoRes = await exeQuery(db.deviceTypeInfoQueryBySnapAddr, [this.payload.snap_addr])
       if (getDeviceTypeInfoRes.rows.length > 0) {
         deviceType = getDeviceTypeInfoRes.rows[0].device_type;
       }
@@ -182,7 +181,7 @@ class VegetationAlertService {
     console.log('getSiteLayoutInfo');
     try {
       //get site_layout info
-      let siteLayoutInfoRes = await this.client.query(
+      let siteLayoutInfoRes = await exeQuery(
         db.siteLayoutInfoByAssetId,
         [this.payload.asset_id]
       );
@@ -209,8 +208,8 @@ class VegetationAlertService {
   async clearCloudAlert(alertId) {
     try {
       console.log("Delete Cloud Alert: ", alertId);
-      await cloudAlertService.clearAlertDetail(this.pgWrite, alertId);
-      return await this.pgWrite.query(db.removeCloudAlert, [alertId]);
+      await cloudAlertService.clearAlertDetail(alertId);
+      return await exeQuery(db.removeCloudAlert, [alertId], { writer: true });
     } catch (err) {
       console.error(err);
       throw new Error(
@@ -223,23 +222,19 @@ class VegetationAlertService {
 
   async addVegetationAlertHist() {
     try {
-      console.log(
-        'addVegetationAlertHist', `
+      const query = `
        INSERT INTO terrasmart.vegetation_alert_hist (snap_addr, timestamp, vegetation_mode_status, temperature_threshold,days_history )
-       VALUES ('${this.snap_addr}'::VARCHAR,
-               ${new Date(this.payload.timestamp).getTime()} :: BIGINT,
-               ${this.payload.modeStatus} :: BOOLEAN,
-               ${this.payload.temperature_threshold} :: INT,
-               Array [${this.payload.daysHist}] :: INTEGER[])
-       `)
-      const addAlertHistRes = await this.pgWrite.query(`
-       INSERT INTO terrasmart.vegetation_alert_hist (snap_addr, timestamp, vegetation_mode_status, temperature_threshold,days_history )
-       VALUES ('${this.snap_addr}'::VARCHAR,
-               ${new Date(this.payload.timestamp).getTime()} :: BIGINT,
-               ${this.payload.modeStatus} :: BOOLEAN,
-               ${this.payload.temperature_threshold} :: INT,
-               Array [${this.payload.daysHist}] :: INTEGER[])
-       `);
+       VALUES ($1::VARCHAR, $2::BIGINT, $3::BOOLEAN, $4::INT, $5::INTEGER[])
+       `;
+      const params = [
+        this.snap_addr,
+        new Date(this.payload.timestamp).getTime(),
+        this.payload.modeStatus,
+        this.payload.temperature_threshold,
+        this.payload.daysHist
+      ];
+      console.log('addVegetationAlertHist', query, params);
+      const addAlertHistRes = await exeQuery(query, params, { writer: true });
       console.log('addAlertHistRes ', addAlertHistRes);
     } catch (err) {
       console.error(err);
@@ -252,7 +247,7 @@ class VegetationAlertService {
   async addCloudAlert() {
     // console.log(`addCloudAlert `);
     try {
-      console.log(db.addCloudAlertByReturnId, [
+      const params = [
         this.getEventName(true),
         this.getEventMessage(true),
         this.payload.timestamp,
@@ -262,18 +257,9 @@ class VegetationAlertService {
         this.getEventTitle(true),
         this.getEventIcon(true),
         20
-      ]);
-      let addcloudAlertResult = await this.pgWrite.query(db.addCloudAlertByReturnId, [
-        this.getEventName(true),
-        this.getEventMessage(true),
-        this.payload.timestamp,
-        this.payload.asset_id,
-        2,
-        true,
-        this.getEventTitle(true),
-        this.getEventIcon(true),
-        20
-      ]);
+      ];
+      console.log(db.addCloudAlertByReturnId, params);
+      let addcloudAlertResult = await exeQuery(db.addCloudAlertByReturnId, params, { writer: true });
       console.log('addcloudAlertResult ', addcloudAlertResult);
       return addcloudAlertResult;
     } catch (err) {
@@ -289,7 +275,7 @@ class VegetationAlertService {
     console.log(`addCloudEventLog(${active})`);
     try {
       if (userInfo !== null) {
-        console.log(db.addCloudEventLogWithUserInfoByReturnId, [
+        const params = [
           this.getEventName(active),
           this.getEventMessage(active),
           20,
@@ -301,23 +287,12 @@ class VegetationAlertService {
           userInfo.user_name,
           userInfo.user_email,
           null
-        ]);
-        let addcloudEventLogResult = await this.pgWrite.query(db.addCloudEventLogWithUserInfoByReturnId, [
-          this.getEventName(active),
-          this.getEventMessage(active),
-          20,
-          new Date(this.payload.timestamp),
-          this.payload.asset_id,
-          2,
-          this.getEventTitle(active),
-          this.getEventIcon(active),
-          userInfo.user_name,
-          userInfo.user_email,
-          null
-        ]);
+        ];
+        console.log(db.addCloudEventLogWithUserInfoByReturnId, params);
+        let addcloudEventLogResult = await exeQuery(db.addCloudEventLogWithUserInfoByReturnId, params, { writer: true });
         console.log(`addcloudEventLogResult ${addcloudEventLogResult.rows}`);
       } else {
-        console.log(db.addCloudEventLogByReturnId, [
+        const params = [
           this.getEventName(active),
           this.getEventMessage(active),
           20,
@@ -326,17 +301,9 @@ class VegetationAlertService {
           2,
           this.getEventTitle(active),
           this.getEventIcon(active),
-        ])
-        let addcloudEventLogResult = await this.pgWrite.query(db.addCloudEventLogByReturnId, [
-          this.getEventName(active),
-          this.getEventMessage(active),
-          20,
-          new Date(this.payload.timestamp),
-          this.payload.asset_id,
-          2,
-          this.getEventTitle(active),
-          this.getEventIcon(active),
-        ]);
+        ];
+        console.log(db.addCloudEventLogByReturnId, params);
+        let addcloudEventLogResult = await exeQuery(db.addCloudEventLogByReturnId, params, { writer: true });
         console.log(`addcloudEventLogResult ${addcloudEventLogResult.rows}`);
 
       }
@@ -362,7 +329,7 @@ class VegetationAlertService {
       console.log("getActiveAlert ");
       console.log(db.getLastCloudAlertQuery,
         [this.getAlertCheckEventName(), this.payload.asset_id]);
-      const alertRes = await this.client.query(db.getLastCloudAlertQuery,
+      const alertRes = await exeQuery(db.getLastCloudAlertQuery,
         [this.getAlertCheckEventName(), this.payload.asset_id]);
       // console.log(`alertRes `, alertRes)
       return alertRes.rows;
@@ -378,7 +345,7 @@ class VegetationAlertService {
       console.log("getActiveAlertByNCId ", this.payload.nc_id);
       console.log(db.cloudAlertQueryByNCId,
         [this.getAlertCheckEventName(true), this.payload.nc_id]);
-      const alertRes = await this.client.query(db.cloudAlertQueryByNCId,
+      const alertRes = await exeQuery(db.cloudAlertQueryByNCId,
         [this.getAlertCheckEventName(true), this.payload.nc_id, this.payload.timestamp]);
       // console.log('alertRes ', alertRes)
       return alertRes.rows;
@@ -486,7 +453,6 @@ class VegetationAlertService {
     console.log(`getNotificationSettings()`)
     try {
       var userAccounts = await notificationSettingService.getAccounts(
-        this.client,
         this.site_id,
         this.getEventNotificationType()
       );
