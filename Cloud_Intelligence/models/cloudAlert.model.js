@@ -45,17 +45,17 @@ const addCloudAlert = async (assetId, eventName, timestamp, title, icon, message
     return null;
 }
 const removeCloudAlert = async (
-    client, alertId
+     alertId
 ) => {
     //remove detail
-    const detailRemoveRes = await pg.removeCloudAlertDetail(client, alertId)
+    const detailRemoveRes = await pg.removeCloudAlertDetail(alertId)
     console.log("DetailRemoveRes ", detailRemoveRes);
-    const res = await pg.removeCloudAlert(client, alertId);
+    const res = await pg.removeCloudAlert(alertId);
     return res;
 }
 
-const getActiveAlertsForAllAssets = (client, ncAssetId) => {
-    return pg.getActiveAlertsForAllAssets(client, ncAssetId);
+const getActiveAlertsForAllAssets = (ncAssetId) => {
+    return pg.getActiveAlertsForAllAssets(ncAssetId);
 
 }
 
