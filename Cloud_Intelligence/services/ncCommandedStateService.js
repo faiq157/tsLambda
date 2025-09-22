@@ -2,6 +2,7 @@ const aws_integration = require("../aws_integration");
 const moment = require("moment-timezone");
 const tzlookup = require("tz-lookup");
 const db = require("../db");
+const { exeQuery } = require("../pg");
 var Handlebars = require("handlebars");
 const utils = require("../utils");
 const { getS3EmailAssetsUrl, formatUserFriendlyTime } = require("../utils/libs/functions");
@@ -19,9 +20,7 @@ const { WeatherForecastStowModel } = require("../models/weatherForecastStow.mode
 const { getProjectDetailsBySiteId } = require('../models/project.model')
 
 class NCCommandedStateService {
-  async handler(client, pgWrite, payload) {
-    this.client = client;
-    this.pgWrite = pgWrite;
+  async handler(payload) {
     this.payload = payload;
     try {
       console.log("NCCommandedStateService");
@@ -34,13 +33,13 @@ class NCCommandedStateService {
       );
     }
   }
-  async handleAnomalyDetectionNightTimeStowEvent(client, payload) {
-    const getLastNCCommandedState = await client.query(
+  async handleAnomalyDetectionNightTimeStowEvent(payload) {
+    const getLastNCCommandedState = await exeQuery(
       db.checkLastNCTrackingCommand,
       [payload.network_controller_id]
     );
     if (getLastNCCommandedState.rows[0].commanded_state !== 5) {
-      await queueHelper.queueDetectedAnomaly(client, payload); // tracking_command_hist
+      await queueHelper.queueDetectedAnomaly(payload); // tracking_command_hist
     }
     return true;
   };
@@ -70,7 +69,7 @@ class NCCommandedStateService {
           await this.handleEstopDisengagedEvent(info);
         }
       }
-      const assetsWithActiveAlerts = await getActiveAlertsForAllAssets(this.client, this.payload.asset_id);
+      const assetsWithActiveAlerts = await getActiveAlertsForAllAssets(this.payload.asset_id);
       console.log("assetsWithActiveAlerts:  ", assetsWithActiveAlerts);
 
       let cloudEventLogId = null;
@@ -99,7 +98,7 @@ class NCCommandedStateService {
   async getUpdateMeta() {
     let info = {};
     try {
-      const network_controller_info = await this.client.query(db.ncInfo, [
+      const network_controller_info = await exeQuery(db.ncInfo, [
         this.payload.network_controller_id,
       ]);
 
@@ -121,7 +120,7 @@ class NCCommandedStateService {
         info.exit_diffuse_mode_duration = data.exit_diffuse_mode_duration;
       }
       console.log(info);
-      info.multipleSites = await notificationService.checkProjectSites(this.client, info.project_id);
+      info.multipleSites = await notificationService.checkProjectSites(info.project_id);
       console.log("Meta ", info);
     } catch (err) {
       console.error(err);
@@ -136,7 +135,7 @@ class NCCommandedStateService {
       console.log(db.checkLastNCTrackingCommand, [
         this.payload.network_controller_id,
       ]);
-      const lastSiteMode = await this.client.query(
+      const lastSiteMode = await exeQuery(
         db.checkLastNCTrackingCommand,
         [this.payload.network_controller_id]
       );
@@ -169,7 +168,7 @@ class NCCommandedStateService {
   async getAssetsLocalErrors() {
     try {
       //check if clid asset have any active status_bits
-      const assetsWithLastStatusBits = await this.client.query(
+      const assetsWithLastStatusBits = await exeQuery(
         db.assetsWithLocalErrors,
         [this.payload.network_controller_id]
       );
@@ -186,7 +185,7 @@ class NCCommandedStateService {
 
   async getActiveAlert() {
     try {
-      const checkAlert = await this.client.query(db.checkCloudAlert, [
+      const checkAlert = await exeQuery(db.checkCloudAlert, [
         this.payload.asset_id,
         "NC-COMMANDED-STATE",
       ]);
@@ -202,14 +201,14 @@ class NCCommandedStateService {
     try {
       console.log("Delete Cloud Alert: ", alertId);
       //todo: remove entries from cloud alert detail table then proceed
-      const detailRemoveRes = await this.pgWrite.query(
+      const detailRemoveRes = await exeQuery(
         `
       Delete from terrasmart.cloud_alert_detail
       WHERE cloud_alert_detail.cloud_alert_id = $1::UUID`,
-        [alertId]
+        [alertId], { writer: true }
       );
       console.log("DetailRemoveRes ", detailRemoveRes);
-      return await this.pgWrite.query(db.removeCloudAlert, [alertId]);
+      return await exeQuery(db.removeCloudAlert, [alertId], { writer: true });
       // return await this.pgWrite.query(db.updateCLoudAlertQuery, [
       //   this.payload.timestamp,
       //   alertId,
@@ -296,7 +295,7 @@ class NCCommandedStateService {
 
       console.log("CLOUD LOG USER INFO: ", userInfo);
       if (userInfo && this.payload.commanded_state !== 7) {
-        return await this.pgWrite.query(
+        return await exeQuery(
           db.addCloudEventLogWithUserInfoByReturnId,
           [
             "NC-COMMANDED-STATE",
@@ -310,10 +309,10 @@ class NCCommandedStateService {
             userInfo.user_name,
             userInfo.user_email,
             sourcePayload? sourcePayload: `{}`
-          ]
+          ], { writer: true }
         );
       } else {
-        return await this.pgWrite.query(db.addCloudEventLogByReturnId, [
+        return await exeQuery(db.addCloudEventLogByReturnId, [
           "NC-COMMANDED-STATE",
           message,
           levelNo,
@@ -322,7 +321,7 @@ class NCCommandedStateService {
           1,
           title,
           icon,
-        ]);
+        ], { writer: true });
       }
     } catch (err) {
       console.error(err);
@@ -334,14 +333,14 @@ class NCCommandedStateService {
     let commanded_state = this.getCommandedState();
     if (commanded_state === 4) {
 
-      siteModeInfo = await getCloudSiteModeHist(this.client, this.payload.network_controller_id);
+      siteModeInfo = await getCloudSiteModeHist(this.payload.network_controller_id);
 
     } else if (commanded_state === 6 || commanded_state === 8 || commanded_state === 9) {
       let commanded_state_detail = this.payload.commanded_state_detail;
       if (commanded_state === 8) commanded_state_detail = 10;
       if (commanded_state === 9) commanded_state_detail = 11;
 
-      siteModeInfo = await getCloudSiteModeHistWithOptMode(this.client, this.payload.network_controller_id,
+      siteModeInfo = await getCloudSiteModeHistWithOptMode(this.payload.network_controller_id,
         commanded_state_detail);
     }
 
@@ -356,7 +355,7 @@ class NCCommandedStateService {
           user_email: data.user_email,
         };
       });
-      if (id) await updateCloudSiteModeHist(this.pgWrite, id);
+      if (id) await updateCloudSiteModeHist(id);
 
     }
 
@@ -410,7 +409,7 @@ class NCCommandedStateService {
 
     console.log("overrideHailAlert this.isHailAlert:", this.isHailAlert);
 
-    const hailAlert = await WeatherForecastStowModel.getActiveWeatherForecastStowBySiteId(this.pgWrite, info.site_id, StowTypes.HAIL_STOW, true)
+    const hailAlert = await WeatherForecastStowModel.getActiveWeatherForecastStowBySiteId(info.site_id, StowTypes.HAIL_STOW, true)
 
     console.log("overrideHailAlert hailAlert:", hailAlert);
 
@@ -464,7 +463,7 @@ class NCCommandedStateService {
     }
 
     if (!this.projectDetails) {
-      this.projectDetails = await getProjectDetailsBySiteId(this.pgWrite, info.site_id)
+      this.projectDetails = await getProjectDetailsBySiteId(info.site_id)
     }
 
     // convert time to local timezone (get timezone from the project timezone)
@@ -560,7 +559,7 @@ class NCCommandedStateService {
       console.log("CLOUD ALERT USER INFO: ", userInfo);
       // console.log("AssetsWithActive Alerts", assetsWithActiveAlerts.rows);
 
-      const existingCloudAlert = await getActiveAlertByAssetId(this.client, this.payload.asset_id, "NC-COMMANDED-STATE");
+      const existingCloudAlert = await getActiveAlertByAssetId(this.payload.asset_id, "NC-COMMANDED-STATE");
 
       if (existingCloudAlert) {
         console.log("Existing Alert Found for NC-COMMANDED-STATE", existingCloudAlert);
@@ -582,7 +581,7 @@ class NCCommandedStateService {
           sourcePayload? sourcePayload: `{}`,
           levelNo
         ]);
-        const addAlertRes = await this.pgWrite.query(
+        const addAlertRes = await exeQuery(
           db.addCloudAlertWithUserInfoByReturnId,
           [
             "NC-COMMANDED-STATE",
@@ -597,13 +596,13 @@ class NCCommandedStateService {
             userInfo.user_email,
             sourcePayload? sourcePayload: `{}`,
             levelNo
-          ]
+          ], { writer: true }
         );
         //process notification
         await this.sendNotification(info, userInfo, assetsWithActiveAlerts);
         return addAlertRes;
       } else {
-        const addAlertRes = await this.pgWrite.query(
+        const addAlertRes = await exeQuery(
           db.addCloudAlertByReturnId,
           [
             "NC-COMMANDED-STATE",
@@ -615,7 +614,7 @@ class NCCommandedStateService {
             title,
             icon,
             levelNo
-          ]
+          ], { writer: true }
         );
         await this.sendNotification(info, null, assetsWithActiveAlerts);
         return addAlertRes;
@@ -631,7 +630,7 @@ class NCCommandedStateService {
     let commanded_state = this.getCommandedState();
     if (commanded_state === 4) {
 
-      siteModeInfo = await getCloudAlertSiteModeHist(this.client, this.payload.network_controller_id);
+      siteModeInfo = await getCloudAlertSiteModeHist(this.payload.network_controller_id);
 
     } else if (commanded_state === 6 || commanded_state === 8 || commanded_state === 9) {
       let commanded_state_detail = this.payload.commanded_state_detail;
@@ -639,7 +638,7 @@ class NCCommandedStateService {
       if (commanded_state === 9) commanded_state_detail = 11;
 
       siteModeInfo = await getCloudAlertSiteModeHistWithOptMode(
-        this.client, this.payload.network_controller_id,
+        this.payload.network_controller_id,
         commanded_state_detail
       );
     }
@@ -655,7 +654,7 @@ class NCCommandedStateService {
           user_email: data.user_email,
         };
       });
-      if (id) await updateCloudAlertSiteModeHist(this.pgWrite, id);
+      if (id) await updateCloudAlertSiteModeHist(id);
     }
 
     return userInfo;
@@ -686,14 +685,14 @@ class NCCommandedStateService {
           query = query.slice(0, -1);
           // console.log(`LOGQUERY:  ${query} `);
 
-          let inf = await this.pgWrite.query(query);
+          let inf = await exeQuery(query, [], { writer: true });
           console.log(`LOGQUERYRES:  ${inf} `);
 
           if (cloudAlertId) {
             cloudAlertQuery = cloudAlertQuery.slice(0, -1);
             // console.log(`ALERTQUERY: ${cloudAlertQuery} `);
 
-            let inf1 = await this.pgWrite.query(cloudAlertQuery);
+            let inf1 = await exeQuery(cloudAlertQuery, [], { writer: true });
             console.log(`ALERTQUERYRES:  ${inf1} `);
           }
         }
@@ -722,7 +721,6 @@ class NCCommandedStateService {
       info.asset_name !== null ? info.asset_name : info.device_type;
 
     var userAccounts = await notificationSettingService.getAccounts(
-      this.client,
       info.site_id,
       "nc_estop"
     );
@@ -801,7 +799,6 @@ class NCCommandedStateService {
       }
 
       var userAccounts = await notificationSettingService.getAccounts(
-        this.client,
         info.site_id,
         notificationType
       );
@@ -874,7 +871,7 @@ class NCCommandedStateService {
         ) {
           info.status_text = "Mode Change w/ Asset Error";
           body_text += " The following assets were in an error state when the mode change occurred.<br/>";
-          detail_text += await functions.getGroupedEvents(this.client, assetsWithActiveAlerts, this.payload.network_controller_id);
+          detail_text += await functions.getGroupedEvents(assetsWithActiveAlerts, this.payload.network_controller_id);
         }
         console.log("--body_text: ", body_text);
         // console.log("--detail_text: ", detail_text);

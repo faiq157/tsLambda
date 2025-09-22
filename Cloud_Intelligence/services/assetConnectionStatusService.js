@@ -2,6 +2,7 @@ const aws_integration = require("../aws_integration");
 const moment = require("moment-timezone");
 const tzlookup = require("tz-lookup");
 const db = require("../db");
+const { exeQuery } = require("../pg");
 var Handlebars = require("handlebars");
 const utils = require("../utils");
 const { getS3EmailAssetsUrl, isLinkedRow } = require("../utils/libs/functions");
@@ -14,9 +15,7 @@ const { getAssetAndSiteLayoutByAssetId } = require("../models/asset.model");
 const { getDeviceTypeNameFromAssetType } = require("../utils/constants");
 
 class AssetConnectionHistService {
-  async handler(client, pgWrite, payload) {
-    this.client = client;
-    this.pgWrite = pgWrite;
+  async handler(payload) {
     this.payload = payload;
     try {
       const res = await this.processEvent();
@@ -25,9 +24,7 @@ class AssetConnectionHistService {
         {
           assetId: this.payload.asset_id,
           timestamp: this.payload.last_asset_updated,
-        },
-        client,
-        pgWrite
+        }
       );
       return res;
     } catch (err) {
@@ -66,7 +63,7 @@ class AssetConnectionHistService {
 
         let commandInfo = await this.getCommandInfo();
         console.log('getting connectLinkedRow data')
-       const connectLinkedRow = await getAssetAndSiteLayoutByAssetId(this.client, this.payload.asset_id)
+       const connectLinkedRow = await getAssetAndSiteLayoutByAssetId(this.payload.asset_id)
        console.log('connectLinkedRow')
        console.log(connectLinkedRow)
        const {
@@ -820,15 +817,14 @@ class AssetConnectionHistService {
             WHERE asset_id = $1::UUID `,
                 [this.payload.asset_id, this.payload.timestamp]
               );
-              const updateSiteLayout = await this.pgWrite.query(
+              const updateSiteLayout = await exeQuery(
                 `UPDATE terrasmart.site_layout set last_action_completed = true, timestamp = $2::TIMESTAMP
                WHERE asset_id = $1::UUID `,
-                [this.payload.asset_id, this.payload.timestamp]
+                [this.payload.asset_id, this.payload.timestamp], { writer: true }
               );
               console.log("updateSiteLayout ", updateSiteLayout);
               if (isLinkedRow(linkRowType, linkRowRef, device_type)) {
                 await CloudAlertsHelperModel.addManualControlAlert(
-                  this.pgWrite,
                   leaderInfo,
                   childInfo,
                   commandInfo.status,
@@ -960,7 +956,7 @@ class AssetConnectionHistService {
     AND last_action_completed = false`,
       [this.payload.asset_id]
     );
-    let res = await this.client.query(
+    let res = await exeQuery(
       `
     Select * from terrasmart.site_layout
     Where site_layout.asset_id = $1::UUID
@@ -969,7 +965,7 @@ class AssetConnectionHistService {
     );
     // console.log("RESULT: ", res);
 
-    let res1 = await this.client.query(
+    let res1 = await exeQuery(
       `
     Select * from terrasmart.site_layout
     Where site_layout.asset_id = $1::UUID`,
@@ -1020,7 +1016,7 @@ class AssetConnectionHistService {
   }
   async checkNewEvent() {
     try {
-      const conhist = await this.client.query(db.checkLastAssetHistUpdate, [
+      const conhist = await exeQuery(db.checkLastAssetHistUpdate, [
         this.payload.asset_id,
         this.payload.last_asset_updated,
       ]);
@@ -1043,7 +1039,7 @@ class AssetConnectionHistService {
       if (asset_status === null || asset_status === undefined) {
         asset_status = this.payload.connected_state;
       }
-      const assetInfo = await this.client.query(db.siteInfoByAssetId, [this.payload.asset_id ]);
+      const assetInfo = await exeQuery(db.siteInfoByAssetId, [this.payload.asset_id ]);
       let info = {};
       await assetInfo.rows.forEach(async (data) => {
         info.is_notify = data.is_notify;
@@ -1058,7 +1054,7 @@ class AssetConnectionHistService {
         info.project_location = data.project_location;
         info.last_reporting_status = data.last_reporting_status;
       });
-      info.multipleSites = await notificationService.checkProjectSites(this.client, info.project_id);
+      info.multipleSites = await notificationService.checkProjectSites(info.project_id);
       info.timestamp = this.payload.timestamp;
       //Notification accounts
       let notification_type = "rc_";
@@ -1088,14 +1084,13 @@ class AssetConnectionHistService {
       console.log("Notif Type ", notification_type);
       console.log("INFO ", info);
       var userAccounts = await notificationSettingService.getAccounts(
-        this.client,
         info.site_id,
         notification_type
       );
       info.emailAddrs = userAccounts.emails;
       info.phoneNumbers = userAccounts.phone_nums;
 
-      var siteLayoutInfo = await this.client.query(
+      var siteLayoutInfo = await exeQuery(
         `
       SELECT site_layout.name,site_layout.i,site_layout.shorthand_name FROM terrasmart.site_layout
       WHERE site_layout.asset_id = $1::UUID
@@ -1119,7 +1114,7 @@ class AssetConnectionHistService {
   }
   async getLastStatus() {
     try {
-      const conhist = await this.client.query(db.checkLastStatusCurrent, [
+      const conhist = await exeQuery(db.checkLastStatusCurrent, [
         this.payload.asset_id
       ]);
       console.log("ConHist ", conhist);
@@ -1159,7 +1154,7 @@ class AssetConnectionHistService {
       WHERE asset_id = $1 :: UUID AND event_name = $2 :: VARCHAR AND active = true`,
         [this.payload.asset_id, event_name]
       );
-      const res = await this.client.query(
+      const res = await exeQuery(
         `SELECT * FROM terrasmart.cloud_alert
              WHERE asset_id = $1 :: UUID AND event_name = $2 :: VARCHAR AND active = true`,
         [this.payload.asset_id, event_name]
@@ -1183,7 +1178,7 @@ class AssetConnectionHistService {
       }
 
       if (userInfo !== null && userInfo !== undefined) {
-        return await this.pgWrite.query(
+        return await exeQuery(
           db.addCloudAlertWithUserInfoByReturnId,
           [
             event_name,
@@ -1198,7 +1193,7 @@ class AssetConnectionHistService {
             userInfo.email,
             null,
             20
-          ]
+          ], { writer: true }
         );
       } else {
         //ADD Alert
@@ -1206,7 +1201,7 @@ class AssetConnectionHistService {
             INSERT INTO terrasmart.cloud_alert(event_name,created,asset_id,type,active,title,icon)
             VALUES ($1 :: VARCHAR, $2 :: TIMESTAMP,$3 :: UUID, $4 :: INT, $5 :: Boolean,$6::VARCHAR,$7::VARCHAR)
             `;
-        return await this.pgWrite.query(addCloudAlertQuery, [
+        return await exeQuery(addCloudAlertQuery, [
           event_name,
           new Date(this.payload.timestamp),
           this.payload.asset_id,
@@ -1214,7 +1209,7 @@ class AssetConnectionHistService {
           true,
           title,
           icon,
-        ]);
+        ], { writer: true });
       }
     } catch (err) {
       console.error(err);
@@ -1226,7 +1221,7 @@ class AssetConnectionHistService {
     try {
       console.log("ADDEVENTLOG ", title, icon, eventName, userInfo);
       if (userInfo !== null && userInfo !== undefined) {
-        return await this.pgWrite.query(
+        return await exeQuery(
           db.addCloudEventLogWithUserInfoByReturnId,
           [
             eventName,
@@ -1240,7 +1235,7 @@ class AssetConnectionHistService {
             userInfo.user_name,
             userInfo.email,
             null
-          ]
+          ], { writer: true }
         );
       } else {
         const cloudEventLogQuery = `
@@ -1248,7 +1243,7 @@ class AssetConnectionHistService {
         VALUES ($1 :: VARCHAR, $2 :: INT, $3 :: TIMESTAMP,$4 :: UUID, $5::INT,$6::VARCHAR,$7::VARCHAR)
         `;
         //ADD Log
-        return await this.pgWrite.query(cloudEventLogQuery, [
+        return await exeQuery(cloudEventLogQuery, [
           eventName,
           20,
           new Date(this.payload.timestamp),
@@ -1256,7 +1251,7 @@ class AssetConnectionHistService {
           2, //Individual Asset Events,
           title,
           icon,
-        ]);
+        ], { writer: true });
       }
     } catch (err) {
       console.error(err);
@@ -1268,8 +1263,8 @@ class AssetConnectionHistService {
     try {
       console.log("Delete Cloud Alert: ", alertId);
 
-      await cloudAlertService.clearAlertDetail(this.pgWrite, alertId);
-      return await this.pgWrite.query(db.removeCloudAlert, [alertId]);
+      await cloudAlertService.clearAlertDetail(alertId);
+      return await exeQuery(db.removeCloudAlert, [alertId], { writer: true });
     } catch (err) {
       console.error(err);
       throw new Error("Operation not completed error clearAlert..!!", err);
@@ -1278,7 +1273,7 @@ class AssetConnectionHistService {
 
   async clearFCSAlert(alertId) {
     // console.log("Delete Cloud Alert: ", alertId);
-    await this.pgWrite.query(db.removeCloudAlert, [alertId]);
+    await exeQuery(db.removeCloudAlert, [alertId], { writer: true });
     // await this.pgWrite.query(db.updateCLoudAlertQuery, [
     //   this.payload.timestamp,
     //   alertId,

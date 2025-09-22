@@ -1,9 +1,8 @@
 const db = require("../db");
+const { exeQuery } = require("../pg");
 
 class AssetWrongReportingService {
-  async handler(client, pgWrite, payload) {
-    this.client = client;
-    this.pgWrite = pgWrite;
+  async handler(payload) {
     this.payload = payload;
     try {
       if (this.payload.registered_NC !== null) {
@@ -94,7 +93,7 @@ class AssetWrongReportingService {
   }
 
   async addCloudEventLog(title, eventName, asset_id, icon) {
-    return await this.pgWrite.query(db.addCloudEventLogQuery, [
+    return await exeQuery(db.addCloudEventLogQuery, [
       eventName,
       20,
       this.payload.timestamp,
@@ -102,11 +101,11 @@ class AssetWrongReportingService {
       1,
       title,
       icon
-    ]);
+    ], { writer: true });
   }
 
   async getAssetInfo() {
-    const res = await this.client.query(
+    const res = await exeQuery(
       `SELECT * FROM terrasmart.asset
       WHERE id = $1::UUID`,
       [this.payload.asset_id]
@@ -114,7 +113,7 @@ class AssetWrongReportingService {
     return res.rows[0];
   }
   async getNCAssetInfo(nc_id) {
-    const res = await this.client.query(
+    const res = await exeQuery(
       `SELECT asset_id,name FROM terrasmart.network_controller WHERE id = $1::UUID`,
       [nc_id]
     );

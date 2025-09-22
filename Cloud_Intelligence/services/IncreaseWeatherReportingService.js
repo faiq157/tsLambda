@@ -10,11 +10,10 @@ const { notificationSettingService } = require("./notificationSettingService");
 const { acquireLock } = require("../utils/libs/execSync");
 const { notificationService } = require("./common/notificationService");
 const { deviceTypeNames } = require("../utils/constants");
+const { exeQuery } = require("../pg");
 
 class IncreaseWeatherReportingService {
-    async handler(client, pgWrite, payload) {
-        this.client = client;
-        this.pgWrite = pgWrite;
+    async handler(payload) {
         this.payload = payload;
         try {
             if (this.payload.snapAddr !== null && this.payload.snapAddr !== "") {
@@ -69,7 +68,7 @@ class IncreaseWeatherReportingService {
                     }
                     query += `);`;
                     console.log(`query: `, query);
-                    await this.pgWrite.query(query);
+                    await exeQuery(query, [], { writer: true });
                 }
             } else {
                 let activeEventName = this.getEventName(payload.reportingType);
@@ -134,7 +133,7 @@ class IncreaseWeatherReportingService {
 
     async updateClearEventMeta(asset_id) {
         let json = {};
-        const assetsInfo = await this.client.query(db.assetinfoForWSReporting, [asset_id]);
+        const assetsInfo = await exeQuery(db.assetinfoForWSReporting, [asset_id]);
         assetsInfo.rows.forEach( (data) => {
             json.asset_id = data.asset_id;
             json.device_type = data.device_type;
@@ -151,7 +150,7 @@ class IncreaseWeatherReportingService {
 
     async updateMeta(payload) {
         var json = {};
-        const assetsInfo = await this.client.query(db.assetinfoForWSReportingBySnapAddr, [
+        const assetsInfo = await exeQuery(db.assetinfoForWSReportingBySnapAddr, [
             payload.snapAddr,
         ]);
 
@@ -209,7 +208,7 @@ class IncreaseWeatherReportingService {
     async getSiteThresholdConf(payload) {
         try {
             console.log();
-            const siteConfResult = await this.client.query(db.siteInfoByNCId, [
+            const siteConfResult = await exeQuery(db.siteInfoByNCId, [
                 payload.network_controller_id,
             ]);
             return siteConfResult.rows;
@@ -233,7 +232,7 @@ class IncreaseWeatherReportingService {
                         payload.network_controller_id
 
                     ]);
-                    checkAlert = await this.client.query(db.checkCloudAlertForAllAssetsBYNCAssetIDNoType, [
+                    checkAlert = await exeQuery(db.checkCloudAlertForAllAssetsBYNCAssetIDNoType, [
                         payload.network_controller_id
                     ]);
                 }
@@ -261,7 +260,7 @@ class IncreaseWeatherReportingService {
                         payload.network_controller_id,
                         eventName
                     ]);
-                    checkAlert = await this.client.query(db.checkCloudAlertForAllAssetsBYNCAssetID, [
+                    checkAlert = await exeQuery(db.checkCloudAlertForAllAssetsBYNCAssetID, [
                         payload.network_controller_id,
                         eventName
                     ]);
@@ -290,7 +289,7 @@ class IncreaseWeatherReportingService {
                 this.getEventICon(eventName),
                 this.getEventMessage(eventName, info, payload)
             ]);
-            const res = await this.pgWrite.query(db.addFullCloudAlertQuery, [
+            const res = await exeQuery(db.addFullCloudAlertQuery, [
                 eventName,
                 payload.timestamp,
                 info.asset_id,
@@ -313,7 +312,7 @@ class IncreaseWeatherReportingService {
         try {
             console.log("Delete Cloud Alert: ", alertId);
             //await cloudAlertService.clearAlertDetail(this.pgWrite, alertId);
-            return await this.pgWrite.query(db.removeCloudAlert, [alertId]);
+            return await exeQuery(db.removeCloudAlert, [alertId], { writer: true });
         } catch (err) {
             console.error(err);
             throw new Error("Operation not completed error clearAlert..!!", err);
@@ -334,7 +333,7 @@ class IncreaseWeatherReportingService {
                     this.getEventICon(event_name),
                     this.getEventMessage(event_name, info, payload),
                 ]);
-            const addEventRes = await this.pgWrite.query(
+            const addEventRes = await exeQuery(
                 db.addFullCloudEventLogQuery,
                 [
                     event_name,
@@ -345,7 +344,8 @@ class IncreaseWeatherReportingService {
                     this.getEventTitle(event_name, info),
                     this.getEventICon(event_name),
                     this.getEventMessage(event_name, info, payload),
-                ]
+                ],
+                { writer: true }
             );
             console.log("Add event for " + event_name + " :", addEventRes);
         } catch (err) {
@@ -546,11 +546,10 @@ class IncreaseWeatherReportingService {
     }
     async processNotification(event_name, info, payload) {
         console.log(`processNotification `, event_name, info, payload);
-        info.multipleSites = await notificationService.checkProjectSites(this.client, info.project_id);
+        info.multipleSites = await notificationService.checkProjectSites(info.project_id);
         console.log(`Multiple sites check: `, info.multipleSites);
         //Get user & site notifications settings
         var userAccounts = await notificationSettingService.getAccounts(
-            this.client,
             info.site_id,
             "ws_inc_repo_" + this.getType(payload.reportingType).toString().toLowerCase()
         );

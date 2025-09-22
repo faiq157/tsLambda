@@ -1,6 +1,7 @@
 const moment = require("moment-timezone");
 const tzlookup = require("tz-lookup");
 const db = require("../db");
+const { exeQuery } = require("../pg");
 var Handlebars = require("handlebars");
 const { cloudAlertService } = require("./cloudAlertService");
 const { notificationSettingService } = require("./notificationSettingService");
@@ -13,9 +14,7 @@ const { getAssetAndSiteLayoutByAssetId } = require("../models/asset.model");
 const { deviceTypeNames } = require("../utils/constants");
 
 class AnomalyDetectionService {
-  async handler(client, pgWrite, payload) {
-    this.client = client;
-    this.pgWrite = pgWrite;
+  async handler(payload) {
     this.payload = payload;
     try {
       // await pgWrite.connect();
@@ -36,7 +35,6 @@ class AnomalyDetectionService {
         console.log('No Anomaly detection for repeaters only');
       } else {
         const linkRowDetails = await getAssetAndSiteLayoutByAssetId(
-          this.client,
           this.payload.asset_id
         );
         const assetName = this.getAssetName(eventMeta);
@@ -189,8 +187,8 @@ class AnomalyDetectionService {
   async clearAlert(alertId) {
     try {
       console.log("Delete Cloud Alert: ", alertId);
-      await cloudAlertService.clearAlertDetail(this.pgWrite, alertId);
-      return await this.pgWrite.query(db.removeCloudAlert, [alertId]);
+      await cloudAlertService.clearAlertDetail(alertId);
+      return await exeQuery(db.removeCloudAlert, [alertId], { writer: true });
     } catch (err) {
       throw new Error("Error In get clearAlert.. ", err);
     }
@@ -304,7 +302,7 @@ class AnomalyDetectionService {
         }
 
       } else {
-      return await this.pgWrite.query(db.addFullCloudAlertQuery, [
+      return await exeQuery(db.addFullCloudAlertQuery, [
         this.getEventNames(this.payload.detection_type, true),
         this.payload.timestamp,
         this.payload.asset_id,
@@ -319,7 +317,7 @@ class AnomalyDetectionService {
           true,
           info
         ),
-      ]);}
+      ], { writer: true });}
     } catch (err) {
       throw new Error("Error In get addCloudAlert.. ", err);
     }
@@ -327,7 +325,7 @@ class AnomalyDetectionService {
 
   async addEventLog(eventTitle, assetName, snap_addr, isActive, info) {
     try {
-      return await this.pgWrite.query(db.addFullCloudEventLogQuery, [
+      return await exeQuery(db.addFullCloudEventLogQuery, [
         this.getEventNames(this.payload.detection_type, isActive),
         20,
         this.payload.timestamp,
@@ -342,7 +340,7 @@ class AnomalyDetectionService {
           isActive,
           info
         ),
-      ]);
+      ], { writer: true });
     } catch (err) {
       throw new Error("Error In get addEventLog.. ", err);
     }
@@ -351,12 +349,12 @@ class AnomalyDetectionService {
   async getEventMeta() {
     try {
 
-      let assetsInfoByAddr = await this.client.query(db.metaInfoByAssetId, [
+      let assetsInfoByAddr = await exeQuery(db.metaInfoByAssetId, [
         this.payload.asset_id,
       ]);
 
       if (assetsInfoByAddr.rows[0].device_type === "Network Controller") {
-        assetsInfoByAddr = await this.client.query(db.metaInfoByNCAssetId, [
+        assetsInfoByAddr = await exeQuery(db.metaInfoByNCAssetId, [
           this.payload.asset_id,
         ]);
       }
@@ -379,9 +377,9 @@ class AnomalyDetectionService {
         info.snap_addr = data.snap_addr;
         info.repeater_only = data.repeater_only;
       });
-      info.multipleSites = await notificationService.checkProjectSites(this.client, info.project_id);
+      info.multipleSites = await notificationService.checkProjectSites(info.project_id);
       if (info.device_type === "Row Controller") {
-        var siteLayoutInfo = await this.client.query(
+        var siteLayoutInfo = await exeQuery(
           `
         SELECT site_layout.name,site_layout.i,site_layout.shorthand_name FROM terrasmart.site_layout
         WHERE site_layout.asset_id = $1::UUID
@@ -409,7 +407,7 @@ class AnomalyDetectionService {
     try {
       console.log(this.payload.detection_type);
       console.log(this.getEventNames(this.payload.detection_type, true));
-      return await this.client.query(db.checkCloudAlert, [
+      return await exeQuery(db.checkCloudAlert, [
         this.payload.asset_id,
         this.getEventNames(this.payload.detection_type, true),
       ]);
@@ -597,7 +595,6 @@ class AnomalyDetectionService {
       notificationType = "anomaly_am_battery_analysis";
 
     var userAccounts = await notificationSettingService.getAccounts(
-      this.client,
       info.site_id,
       notificationType
     );

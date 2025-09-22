@@ -15,11 +15,10 @@ const { getSiteModeInfo } = require("../models/networkcontroller.model");
 const { getActiveAlert, addCloudAlertWithUserInfo, addCloudAlert } = require("../models/cloudAlert.model");
 const { addCloudEventLogWithUserInfo, addCloudEventLog, addCloudEventLogDetail, getTimelineEventByEventNameAndTime } = require("../models/cloudEventLog.model");
 const { CloudAlertsHelperModel } = require("../models/cloudAlertsHelper.model");
+const { exeQuery } = require("../pg");
 
 class RemoteQCReportService {
-    async handler(client, pgWrite, payload) {
-        this.client = client;
-        this.pgWrite = pgWrite;
+    async handler(payload) {
         try {
             if (payload.siteMode === 8) {
                 const res = await this.processQCModeEvent(payload);
@@ -45,10 +44,10 @@ class RemoteQCReportService {
             3000,
             // Things to do while being in locked state
             async () => {
-                const getTrackingModeInfo = await getSiteModeInfo(this.client, assetInfo.nc_id);
+                const getTrackingModeInfo = await getSiteModeInfo(assetInfo.nc_id);
                 if (getTrackingModeInfo) {
                     //get timeline event for remote qc report
-                    timelineEvent = await getTimelineEventByEventNameAndTime(this.client, assetInfo.nc_asset_id, eventName.REMOTE_QC_REPORT, getTrackingModeInfo.commanded_state_changed_at);
+                    timelineEvent = await getTimelineEventByEventNameAndTime(assetInfo.nc_asset_id, eventName.REMOTE_QC_REPORT, getTrackingModeInfo.commanded_state_changed_at);
                     if (!timelineEvent) {
                         //add Eventlog and return timeLineEvent
                         let icon = await this.getIcon(eventName.REMOTE_QC_REPORT);
@@ -65,8 +64,8 @@ class RemoteQCReportService {
 
     async processQCModeEvent(payload) {
         let assetInfo = await this.getAssetInfo(payload.snapAddr);
-        const checkAlert = await getActiveAlert(this.client, payload.snapAddr, eventName.OFFLINE);
-        const checkRemoteQaQcAlert = await getActiveAlert(this.client, payload.snapAddr, eventName.REMOTE_QC);
+        const checkAlert = await getActiveAlert(payload.snapAddr, eventName.OFFLINE);
+        const checkRemoteQaQcAlert = await getActiveAlert(payload.snapAddr, eventName.REMOTE_QC);
         if (checkAlert) {
             let icon = await this.getIcon(eventName.ONLINE);
             let title = await this.getTitle(assetInfo, payload, eventName.ONLINE);
@@ -86,7 +85,7 @@ class RemoteQCReportService {
             const getTimelineEvent = await this.getTimelineEvent(payload, assetInfo);
             if (getTimelineEvent) {
                 //add cloud event log detail
-                await addCloudEventLogDetail(this.pgWrite, assetInfo.assetId, eventName.REMOTE_QC_COMPLETE, payload.timestamp,
+                await addCloudEventLogDetail(assetInfo.assetId, eventName.REMOTE_QC_COMPLETE, payload.timestamp,
                     title, icon, 2, 30, getTimelineEvent.id)
             } else {
                 //add remoteQC Event
@@ -108,7 +107,7 @@ class RemoteQCReportService {
                     console.log('STATUS BITS: ', assetInfo.statusBits);
                     console.log(getStatusBit(assetInfo.statusBits));
                     //add cloud event log detail
-                    await addCloudEventLogDetail(this.pgWrite, assetInfo.assetId, eventName.REMOTE_QC_FAILED, payload.timestamp,
+                    await addCloudEventLogDetail(assetInfo.assetId, eventName.REMOTE_QC_FAILED, payload.timestamp,
                         title, icon, 2, 30, getTimelineEvent.id, { status_bits: getStatusBit(assetInfo.statusBits) });
                 } else {
                     //add remoteQC Event
@@ -119,8 +118,8 @@ class RemoteQCReportService {
     }
     async processEvent(payload) {
         let assetInfo = await this.getAssetInfo(payload.snapAddr);
-        const checkAlert = await getActiveAlert(this.client, payload.snapAddr, eventName.OFFLINE);
-        const checkRemoteQaQcAlert = await getActiveAlert(this.client, payload.snapAddr, eventName.REMOTE_QC);
+        const checkAlert = await getActiveAlert(payload.snapAddr, eventName.OFFLINE);
+        const checkRemoteQaQcAlert = await getActiveAlert(payload.snapAddr, eventName.REMOTE_QC);
 
         const {
             linkRowType,
@@ -131,7 +130,7 @@ class RemoteQCReportService {
             asset_name,
             device_type,
             assetId
-          } = await getAssetAndSiteLayoutByAssetId(this.client, assetInfo.assetId)
+          } = await getAssetAndSiteLayoutByAssetId(assetInfo.assetId)
 
          const isLinked = isLinkedRow(linkRowType, linkRowRef, device_type)
 
@@ -171,7 +170,6 @@ class RemoteQCReportService {
                 if (isLinked) {
                     
                     await CloudAlertsHelperModel.addRowOnlineAlert(
-                        this.pgWrite,
                         leaderInfo,
                         childInfo,
                         true,
@@ -192,7 +190,6 @@ class RemoteQCReportService {
 
                 if (isLinked) {
                     await CloudAlertsHelperModel.addRemoteqcStopAlert(
-                      this.pgWrite,
                       leaderInfo,
                       childInfo,
                       true,
@@ -224,14 +221,13 @@ class RemoteQCReportService {
                     asset_name,
                     device_type,
                     assetId
-                  } = await getAssetAndSiteLayoutByAssetId(this.client, assetInfo.assetId)
+                  } = await getAssetAndSiteLayoutByAssetId(assetInfo.assetId)
                 let icon = await this.getIcon(assetStatus.REMOTE_QC);
                 let title = await this.getTitle(assetInfo, payload);
                 title = `${title} Remote QC Start`;
 
                 if (isLinked) {
                   await CloudAlertsHelperModel.addRemoteqcStartAlert(
-                    this.pgWrite,
                     leaderInfo,
                     childInfo,
                     true,
@@ -271,15 +267,14 @@ class RemoteQCReportService {
     async getAssetInfo(snapAddr) {
         try {
 
-            const assetInfo = await getAssetBySnapAddr(this.client, snapAddr);
+            const assetInfo = await getAssetBySnapAddr(snapAddr);
             let info = this.mapInfo(assetInfo);
-            info.multipleSites = await notificationService.checkProjectSites(this.client, info.projectId);
+            info.multipleSites = await notificationService.checkProjectSites(info.projectId);
 
             //Notification accounts
             let notification_type = "rc_remote_qaqc_control";
 
             var userAccounts = await notificationSettingService.getAccounts(
-                this.client,
                 info.siteId,
                 notification_type
             );
@@ -319,11 +314,11 @@ class RemoteQCReportService {
             console.log("ADDEVENTLOG ", title, icon, eventName, userInfo);
             if (userInfo !== null && userInfo !== undefined) {
                 return await addCloudEventLogWithUserInfo(
-                    this.pgWrite, assetId, eventName, payload.timestamp,
+                    assetId, eventName, payload.timestamp,
                     title, icon, userInfo.user_name, userInfo.user_email, 30);
             } else {
                 //ADD Log
-                return await addCloudEventLog(this.pgWrite, assetId, eventName, payload.timestamp, title, icon, null, 30);
+                return await addCloudEventLog(assetId, eventName, payload.timestamp, title, icon, null, 30);
             }
         } catch (err) {
             console.error(err);
@@ -335,8 +330,8 @@ class RemoteQCReportService {
         try {
             console.log("Delete Cloud Alert: ", alertId);
 
-            await cloudAlertService.clearAlertDetail(this.pgWrite, alertId);
-            return await this.pgWrite.query(db.removeCloudAlert, [alertId]);
+            await cloudAlertService.clearAlertDetail(alertId);
+            return await exeQuery(db.removeCloudAlert, [alertId], { writer: true });
         } catch (err) {
             console.error(err);
             throw new Error("Operation not completed error clearAlert..!!", err);
@@ -345,7 +340,7 @@ class RemoteQCReportService {
 
     async getActiveAlert(payload, eventName) {
         try {
-            return getActiveAlert(this.client, payload.snapAddr, eventName);
+            return getActiveAlert(payload.snapAddr, eventName);
 
         } catch (err) {
             console.error(err);
@@ -357,11 +352,11 @@ class RemoteQCReportService {
             if (payload.user_email !== null && payload.user_email !== undefined) {
                 console.log("adding alert with user info...")
                 return await addCloudAlertWithUserInfo(
-                    this.pgWrite, assetInfo.assetId, eventName, payload.timestamp,
+                    assetInfo.assetId, eventName, payload.timestamp,
                     title, icon, payload.user_name, payload.user_email, null, null, 30);
             } else {
                 //ADD Alert
-                return addCloudAlert(this.pgWrite, assetInfo.assetId, eventName, payload.timestamp, title, icon, null,null, 30);
+                return addCloudAlert(assetInfo.assetId, eventName, payload.timestamp, title, icon, null,null, 30);
             }
         } catch (err) {
             console.error(err);

@@ -1,11 +1,10 @@
 //! THIS FILE IS DEPRECATED AND NOT USED
 const db = require("../db");
 const { getDeviceTypeNameFromAssetType } = require("../utils/constants");
+const { exeQuery } = require("../pg");
 
 class AssetStatusBitsService {
-  async handler(client, pgWrite, payload) {
-    this.client = client;
-    this.pgWrite = pgWrite;
+  async handler(payload) {
     this.payload = payload;
     try {
       // await this.pgWrite.connect();
@@ -24,43 +23,37 @@ class AssetStatusBitsService {
       const updateMeta = await this.getUpdateMeta();
       const assetInfo = await this.mapInfo(updateMeta);
       //assetInfo.multipleSites = await notificationService.checkProjectSites(this.client,assetInfo.project_id);
-      let assetName = getAssetName(assetInfo);
+      let assetName = this.getAssetName(assetInfo);
       assetInfo.asset_name = assetName;
       console.log("ASSETINFO: ", assetInfo);
 
-      await updateNCCommandedStateAlert(client, pgWrite, payload, updateMeta);
+      await updateNCCommandedStateAlert(payload, updateMeta);
 
-      await handleNoCommunicationWithNC(client, pgWrite, payload, assetInfo);
+      await handleNoCommunicationWithNC(payload, assetInfo);
 
-      await handleLowBatteryAutoStow(client, pgWrite, payload, assetInfo);
+      await handleLowBatteryAutoStow(payload, assetInfo);
 
-      await handleChargerFault(client, payload, pgWrite, assetInfo);
+      await handleChargerFault(payload, assetInfo);
 
       await handleLowTemperatureRestrictedMovement(
-        client,
-        pgWrite,
         payload,
         assetInfo
       );
 
       await handleMotorCurrentSoftwareFault(
-        client,
-        pgWrite,
         payload,
         assetInfo
       );
 
-      await handleMotorFaultTimeout(client, pgWrite, payload, assetInfo);
+      await handleMotorFaultTimeout(payload, assetInfo);
 
       await handleMotorCurrentHardwareFault(
-        client,
-        pgWrite,
         payload,
         assetInfo
       );
 
       if (assetInfo.is_status_bits_notify) {
-        await handleEmergencyStop(client, pgWrite, payload, assetInfo);
+        await handleEmergencyStop(payload, assetInfo);
       } else {
         console.log("SITE Notification Disabled");
       }
@@ -73,7 +66,7 @@ class AssetStatusBitsService {
   async getUpdateMeta() {
     try {
       console.log("getUpdateMeta ", this.payload.asset_id);
-      let result = await this.client.query(db.siteInfoByAssetId, [ this.payload.asset_id ]);
+      let result = await exeQuery(db.siteInfoByAssetId, [ this.payload.asset_id ]);
       console.log("Res: ", result.rows);
       return result.rows[0];
     } catch (err) {
@@ -93,7 +86,7 @@ class AssetStatusBitsService {
     assetInfo.location_lng = data.location_lng;
     assetInfo.asset_name = data.asset_name;
     assetInfo.project_name = data.project_name;
-    assetInfo.project_id = assetInfo.project_id;
+    assetInfo.project_id = data.project_id;
     assetInfo.project_location = data.project_location;
     assetInfo.status_bits = data.asset_status_bits;
 
@@ -118,12 +111,12 @@ class AssetStatusBitsService {
     return arr;
   }
 
-  async handleBits(assetInfo) {
+  async handleBits(payload, assetInfo) {
     console.log("handleLowBatteryAutoStow");
-    const statusBitsList = getStatusBit(payload.status_bits);
+    const statusBitsList = this.getStatusBit(payload.status_bits);
     let promises = [];
     statusBitsList.forEach(async item => {
-      promises.push(processLocalError(assetInfo, item));
+      promises.push(this.processLocalError(payload, assetInfo, item));
     });
 
     Promise.all(promises)
@@ -134,22 +127,22 @@ class AssetStatusBitsService {
         console.log("ALERT: ", excep);
       });
     //check already alert generated
-    const checkAlert = await getActiveAlert(client, payload, assetInfo, bit);
+    const checkAlert = await this.getActiveAlert(payload, assetInfo, bit);
     try {
       if (containsLowBatteryStow(statusBitsList)) {
         //check already alert generated
         //if not add new alert else ignore
         if (checkAlert.rows.length === 0) {
           //add new alert
-          await addAlert(pgWrite, payload, assetInfo, bit);
+          await addAlert(payload, assetInfo, bit);
           //add event log
-          await addEventLog(pgWrite, payload, assetInfo, bit);
+          await addEventLog(payload, assetInfo, bit);
         }
       } else {
         //if created flag inactive it
         if (checkAlert.rows.length > 0) {
           //flag it inactive
-          await clearAlert(pgWrite, payload, checkAlert.rows[0].id);
+          await clearAlert(payload, checkAlert.rows[0].id);
         }
       }
     } catch (exception) {
@@ -157,17 +150,17 @@ class AssetStatusBitsService {
     }
   }
 
-  async getActiveAlert(assetInfo, bit) {
-    return await this.client.query(checkAlertQuery, [
-      this.payload.asset_id,
+  async getActiveAlert(payload, assetInfo, bit) {
+    return await exeQuery(checkAlertQuery, [
+      payload.asset_id,
       assetInfo.device_type === "Network Controller"
-        ? "NC-" + EVENT_NAMES[bit]
-        : "ASSET-" + EVENT_NAMES[bit]
+        ? "NC-" + this.getEventName(bit)
+        : "ASSET-" + this.getEventName(bit)
     ]);
   }
-  async processLocalError(assetInfo, bit) {
+  async processLocalError(payload, assetInfo, bit) {
     //check alert
-    const checkAlert = await getActiveAlert(client, payload, assetInfo, bit);
+    const checkAlert = await this.getActiveAlert(payload, assetInfo, bit);
     if (checkAlert) {
     }
   }

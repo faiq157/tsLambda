@@ -2,6 +2,7 @@ const aws_integration = require("../aws_integration");
 const moment = require("moment-timezone");
 const tzlookup = require("tz-lookup");
 const db = require("../db");
+const { exeQuery } = require("../pg");
 var Handlebars = require("handlebars");
 const utils = require("../utils");
 const { getS3EmailAssetsUrl, isLinkedRow } = require("../utils/libs/functions");
@@ -12,9 +13,7 @@ const { CloudAlertsHelperModel } = require("../models/cloudAlertsHelper.model");
 const { getAssetAndSiteLayoutByAssetId } = require("../models/asset.model");
 const { getDeviceTypeNameFromAssetType } = require("../utils/constants");
 class CommandStatusService {
-  async handler(client, pgWrite, payload) {
-    this.client = client;
-    this.pgWrite = pgWrite;
+  async handler(payload) {
     this.payload = payload;
     try {
       const res = await this.processEvent();
@@ -44,11 +43,11 @@ class CommandStatusService {
         if (commandInfo.rc_cmd_state === 3) {
           //todo update site layout
 
-          const siteLayoutRes = await this.pgWrite.query(
+          const siteLayoutRes = await exeQuery(
             `UPDATE terrasmart.site_layout
            set last_action_completed = true, timestamp = $1::TIMESTAMP
            Where asset_id = $2::UUID`,
-            [this.payload.timestamp, this.payload.assetId]
+            [this.payload.timestamp, this.payload.assetId], { writer: true }
           );
           console.log("siteLayoutRes: ", siteLayoutRes);
 
@@ -71,7 +70,7 @@ class CommandStatusService {
             asset_name,
             snap_addr,
             device_type,
-          } = await getAssetAndSiteLayoutByAssetId(this.client, this.payload.asset_id)
+          } = await getAssetAndSiteLayoutByAssetId(this.payload.asset_id)
           let title = await this.getTitle(assetInfo, "MANUAL CONTROL");
           let icon = await this.getIcon(assetInfo, "MANUAL CONTROL");
 
@@ -154,11 +153,11 @@ class CommandStatusService {
           this.checkSameCmds(commandInfo)
         ) {
           //todo update site layout
-          const siteLayoutRes = await this.pgWrite.query(
+          const siteLayoutRes = await exeQuery(
             `UPDATE terrasmart.site_layout
          set last_action_completed = true, timestamp = $1::TIMESTAMP
          Where asset_id = $2::UUID`,
-            [this.payload.timestamp, this.payload.assetId]
+            [this.payload.timestamp, this.payload.assetId], { writer: true }
           );
           console.log("siteLayoutRes: ", siteLayoutRes);
 
@@ -182,7 +181,7 @@ class CommandStatusService {
               asset_name,
               snap_addr,
               device_type,
-            } = await getAssetAndSiteLayoutByAssetId(this.client, this.payload.asset_id)
+            } = await getAssetAndSiteLayoutByAssetId(this.payload.asset_id)
 
             let title = await this.getTitle(assetInfo, "MANUAL CONTROL");
             let icon = await this.getIcon(assetInfo, "MANUAL CONTROL");
@@ -299,7 +298,7 @@ class CommandStatusService {
     OR individual_rc_param != 0)`,
       [this.payload.assetId]
     );
-    let res = await this.client.query(
+    let res = await exeQuery(
       `
     Select * from terrasmart.site_layout
     Where site_layout.asset_id = $1::UUID
@@ -310,7 +309,7 @@ class CommandStatusService {
     );
     // console.log("RESULT: ", res);
 
-    let res1 = await this.client.query(
+    let res1 = await exeQuery(
       `
     Select * from terrasmart.site_layout
     Where site_layout.asset_id = $1::UUID`,
@@ -361,7 +360,7 @@ class CommandStatusService {
   }
   async checkNewEvent() {
     try {
-      const conhist = await this.client.query(db.checkLastAssetHistUpdate, [
+      const conhist = await exeQuery(db.checkLastAssetHistUpdate, [
         this.payload.assetId,
         this.payload.timestamp,
       ]);
@@ -383,7 +382,7 @@ class CommandStatusService {
   }
   async getAssetInfo() {
     try {
-      const assetInfo = await this.client.query(db.siteInfoByAssetId, [ this.payload.assetId ]);
+      const assetInfo = await exeQuery(db.siteInfoByAssetId, [ this.payload.assetId ]);
       let info = {};
       await assetInfo.rows.forEach(async (data) => {
         info.is_notify = data.is_notify;
@@ -398,7 +397,7 @@ class CommandStatusService {
         info.project_id = data.project_id;
         info.project_location = data.project_location;
       });
-      info.multipleSites = await notificationService.checkProjectSites(this.client, info.project_id);
+      info.multipleSites = await notificationService.checkProjectSites(info.project_id);
       info.timestamp = this.payload.timestamp;
       //Notification accounts
       let notification_type = "rc_under_manual_control";
@@ -406,13 +405,12 @@ class CommandStatusService {
       console.log("Notif Type ", notification_type);
       console.log("INFO ", info);
       var userAccounts = await notificationSettingService.getAccounts(
-        this.client,
         info.site_id,
         notification_type
       );
       info.emailAddrs = userAccounts.emails;
       info.phoneNumbers = userAccounts.phone_nums;
-      var siteLayoutInfo = await this.client.query(
+      var siteLayoutInfo = await exeQuery(
         `
       SELECT site_layout.name, site_layout.i,site_layout.shorthand_name FROM terrasmart.site_layout
       WHERE site_layout.asset_id = $1::UUID
@@ -444,7 +442,7 @@ class CommandStatusService {
   }
   async getLastStatus() {
     try {
-      const conhist = await this.client.query(db.checkLastStatusCurrent, [
+      const conhist = await exeQuery(db.checkLastStatusCurrent, [
         this.payload.assetId
       ]);
       console.log(db.checkLastStatusCurrent, [
@@ -487,7 +485,7 @@ class CommandStatusService {
       WHERE asset_id = $1 :: UUID AND event_name = $2 :: VARCHAR AND active = true`,
         [this.payload.assetId, event_name]
       );
-      const res = await this.client.query(
+      const res = await exeQuery(
         `SELECT * FROM terrasmart.cloud_alert
              WHERE asset_id = $1 :: UUID AND event_name = $2 :: VARCHAR AND active = true`,
         [this.payload.assetId, event_name]
@@ -503,7 +501,7 @@ class CommandStatusService {
   async addCloudAlert(title, icon, event_name, userInfo) {
     try {
       if (userInfo !== null && userInfo !== undefined) {
-        return await this.pgWrite.query(
+        return await exeQuery(
           db.addCloudAlertWithUserInfoByReturnId,
           [
             event_name,
@@ -518,7 +516,7 @@ class CommandStatusService {
             userInfo.email,
             null,
             20
-          ]
+          ], { writer: true }
         );
       } else {
         //ADD Alert
@@ -526,7 +524,7 @@ class CommandStatusService {
             INSERT INTO terrasmart.cloud_alert(event_name,created,asset_id,type,active,title,icon)
             VALUES ($1 :: VARCHAR, $2 :: TIMESTAMP,$3 :: UUID, $4 :: INT, $5 :: Boolean,$6::VARCHAR,$7::VARCHAR)
             `;
-        return await this.pgWrite.query(addCloudAlertQuery, [
+        return await exeQuery(addCloudAlertQuery, [
           event_name,
           new Date(this.payload.timestamp),
           this.payload.assetId,
@@ -534,7 +532,7 @@ class CommandStatusService {
           true,
           title,
           icon,
-        ]);
+        ], { writer: true });
       }
     } catch (err) {
       console.error(err);
@@ -546,7 +544,7 @@ class CommandStatusService {
     try {
       console.log("ADDEVENTLOG ", title, icon, eventName, userInfo);
       if (userInfo !== null && userInfo !== undefined) {
-        return await this.pgWrite.query(
+        return await exeQuery(
           db.addCloudEventLogWithUserInfoByReturnId,
           [
             eventName,
@@ -560,7 +558,7 @@ class CommandStatusService {
             userInfo.user_name,
             userInfo.email,
             null
-          ]
+          ], { writer: true }
         );
       } else {
         const cloudEventLogQuery = `
@@ -568,7 +566,7 @@ class CommandStatusService {
         VALUES ($1 :: VARCHAR, $2 :: INT, $3 :: TIMESTAMP,$4 :: UUID, $5::INT,$6::VARCHAR,$7::VARCHAR)
         `;
         //ADD Log
-        return await this.pgWrite.query(cloudEventLogQuery, [
+        return await exeQuery(cloudEventLogQuery, [
           eventName,
           20,
           new Date(this.payload.timestamp),
@@ -576,7 +574,7 @@ class CommandStatusService {
           2, //Individual Asset Events,
           title,
           icon,
-        ]);
+        ], { writer: true });
       }
     } catch (err) {
       console.error(err);
@@ -587,8 +585,8 @@ class CommandStatusService {
   async clearAlert(alertId) {
     try {
       console.log("Delete Cloud Alert: ", alertId);
-      await cloudAlertService.clearAlertDetail(this.pgWrite, alertId);
-      return await this.pgWrite.query(db.removeCloudAlert, [alertId]);
+      await cloudAlertService.clearAlertDetail(alertId);
+      return await exeQuery(db.removeCloudAlert, [alertId], { writer: true });
     } catch (err) {
       console.error(err);
       throw new Error("Operation not completed error clearAlert..!!", err);
@@ -597,7 +595,7 @@ class CommandStatusService {
 
   async clearFCSAlert(alertId) {
     // console.log("Delete Cloud Alert: ", alertId);
-    await this.pgWrite.query(db.removeCloudAlert, [alertId]);
+    await exeQuery(db.removeCloudAlert, [alertId], { writer: true });
     // await this.pgWrite.query(db.updateCLoudAlertQuery, [
     //   this.payload.timestamp,
     //   alertId,

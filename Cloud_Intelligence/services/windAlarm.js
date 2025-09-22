@@ -1,4 +1,5 @@
 const db = require("../db");
+const { exeQuery } = require("../pg");
 
 const {
   getPgTimestamp,
@@ -12,9 +13,7 @@ const noWeatherStowHours = 8;
 const weatherStowHours = 12;
 
 class WindAlarm {
-  constructor(client, wsId) {
-    // pg reader instance to query for data
-    this.client = client;
+  constructor(wsId) {
     // Id of Network COntroller the Weather Station is connected
     this.ncId = null;
     // Id of the Weather Station update is received from
@@ -138,7 +137,7 @@ class WindAlarm {
     // get 24 hour old timestamp
     const fetchSince = getPgTimestamp(getOldTime(24));
     const query = db.getWindData;
-    const result = await this.client.query(query, [this.wsId, fetchSince]);
+    const result = await exeQuery(query, [this.wsId, fetchSince]);
     console.log("Querying For Wind Data: ", query, [this.wsId, fetchSince]);
     // console.log("Got wind data: ", result.rows);
     this.windData = result.rows.map((row) => ({
@@ -189,7 +188,7 @@ class WindAlarm {
     // check for night time stow one hour before the sleep event has happened
     const ncStowEventTime = getPgTimestamp(getOldTime(1, this.ncSleep));
     const queryParams = [this.ncId, this.ncSleep, 5, ncStowEventTime];
-    const result = await this.client.query(query, queryParams);
+    const result = await exeQuery(query, queryParams);
     console.log("Querying For Nightly Stow: ", query, queryParams);
     console.log("Got NC Stow event data: ", result.rows);
     // If there is a night time stow event then set the ncSleep to that time
@@ -212,7 +211,7 @@ class WindAlarm {
     // check for Tracking with Back Tracking one hour after the wake up event has happened
     const ncWakeUpTime = new Date(addTime(1, this.ncWakeUp));
     const queryParams = [this.ncId, this.ncWakeUp, 4, ncWakeUpTime];
-    const result = await this.client.query(query, queryParams);
+    const result = await exeQuery(query, queryParams);
     console.log("Querying For Tracking: ", query, queryParams);
     console.log("Got NC Wake event data: ", result.rows);
     // If there is a Tracking with Back Tracking event then set the ncWakeUp to that time
@@ -226,7 +225,7 @@ class WindAlarm {
    */
   async isInWeatherStow() {
     const query = db.isInWeatherStow;
-    const result = await this.client.query(query, [this.wsId]);
+    const result = await exeQuery(query, [this.wsId]);
 
     hours =
       result.rows.length && result.rows[0].commanded_state === 2
@@ -239,7 +238,7 @@ class WindAlarm {
    */
   async getNC() {
     const query = db.getNC;
-    const result = await this.client.query(query, [this.wsId]);
+    const result = await exeQuery(query, [this.wsId]);
     console.log("Got NC ", result.rows);
 
     if (!result.rows.length) throw new Error("NC not found for: ", this.wsId);

@@ -1,6 +1,7 @@
 const moment = require("moment-timezone");
 const tzlookup = require("tz-lookup");
 const db = require("../db");
+const { exeQuery } = require("../pg");
 var Handlebars = require("handlebars");
 const { cloudAlertService } = require("./cloudAlertService");
 const { notificationSettingService } = require("./notificationSettingService");
@@ -15,9 +16,7 @@ const { getAssetAndSiteLayoutByAssetId } = require("../models/asset.model");
 const { deviceTypeNames } = require("../utils/constants");
 
 class MLNotificationService {
-  async handler(client, pgWrite, payload) {
-    this.client = client;
-    this.pgWrite = pgWrite;
+  async handler(payload) {
     this.payload = payload;
     try {
       // await pgWrite.connect();
@@ -40,7 +39,7 @@ class MLNotificationService {
         //Due Date Conversion
         // await this.convertDueDateByTimeZone(eventMeta);
         // await this.convertEventTimeByZone(eventMeta);
-        const linkedRowDetails = await getAssetAndSiteLayoutByAssetId(this.client, this.payload.asset_id);
+        const linkedRowDetails = await getAssetAndSiteLayoutByAssetId(this.payload.asset_id);
         const assetName = this.getAssetName(eventMeta);
         const { snap_addr } = eventMeta;
 
@@ -313,11 +312,11 @@ class MLNotificationService {
         this.payload.timestamp,
         alert_id,
       ]);
-      return await this.pgWrite.query(db.updateActiveAlert, [
+      return await exeQuery(db.updateActiveAlert, [
         this.getMessage(this.payload.ml_type, assetName, snap_addr, info),
         this.payload.timestamp,
         alert_id,
-      ]);
+      ], { writer: true });
     } catch (err) {
       throw new Error("Error In updateCloudAlert.. ", err);
     }
@@ -347,12 +346,12 @@ class MLNotificationService {
   async getEventMeta() {
     try {
 
-      let assetsInfoByAddr = await this.client.query(db.metaInfoByAssetId, [
+      let assetsInfoByAddr = await exeQuery(db.metaInfoByAssetId, [
         this.payload.asset_id,
       ]);
 
       if (assetsInfoByAddr.rows[0].device_type === "Network Controller") {
-        assetsInfoByAddr = await this.client.query(db.metaInfoByNCAssetId, [
+        assetsInfoByAddr = await exeQuery(db.metaInfoByNCAssetId, [
           this.payload.asset_id,
         ]);
         // console.log("RES: ", assetsInfoByAddr.rows);
@@ -376,7 +375,7 @@ class MLNotificationService {
         info.snap_addr = data.snap_addr;
         info.repeater_only = data.repeater_only;
       });
-      info.multipleSites = await notificationService.checkProjectSites(this.client, info.project_id);
+      info.multipleSites = await notificationService.checkProjectSites(info.project_id);
       this.payload.device_type = info.device_type;
       return info;
     } catch (err) {
@@ -389,7 +388,6 @@ class MLNotificationService {
       console.log(this.payload.ml_type);
       console.log(this.getEventNames(this.payload.ml_type, true));
       return getActiveAlertByAssetId(
-        this.client,
         this.payload.asset_id,
         this.getEventNames(this.payload.ml_type, true));
     } catch (err) {
@@ -527,7 +525,6 @@ class MLNotificationService {
       notificationType = "ml_battery_analysis";
 
     var userAccounts = await notificationSettingService.getAccounts(
-      this.client,
       info.site_id,
       notificationType,
       true
