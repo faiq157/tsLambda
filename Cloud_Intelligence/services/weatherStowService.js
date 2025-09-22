@@ -154,7 +154,7 @@ class WeatherStowService {
         this.asset_name = await this.getAssetName();
         console.log(`ASSETINFO: [nc_id: ${this.network_controller_id}] [nc_name: ${this.network_controller_name}] [nc_asset_id: ${this.network_controller_asset_id}] [is_notify: ${this.is_notify}] [snap_addr: ${this.snap_addr}] [asset_name: ${this.asset_name}]`);
       }
-      this.multipleSites = await notificationService.checkProjectSites(this.client, this.project_id);
+      this.multipleSites = await notificationService.checkProjectSites(this.project_id);
       return assetInfoRes.rows;
     } catch (err) {
       console.error(err);
@@ -969,7 +969,6 @@ class WeatherStowService {
     console.log(`getNotificationSettings(${type})`)
     try {
       var userAccounts = await notificationSettingService.getAccounts(
-        this.client,
         this.site_id,
         this.getEventNotificationType(type)
       );

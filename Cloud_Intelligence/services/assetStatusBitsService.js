@@ -45,6 +45,7 @@ class AssetStatusBitsService {
         assetInfo
       );
 
+
       await handleMotorFaultTimeout(payload, assetInfo);
 
       await handleMotorCurrentHardwareFault(
@@ -110,7 +111,6 @@ class AssetStatusBitsService {
     });
     return arr;
   }
-
   async handleBits(payload, assetInfo) {
     console.log("handleLowBatteryAutoStow");
     const statusBitsList = this.getStatusBit(payload.status_bits);
@@ -128,6 +128,7 @@ class AssetStatusBitsService {
       });
     //check already alert generated
     const checkAlert = await this.getActiveAlert(payload, assetInfo, bit);
+
     try {
       if (containsLowBatteryStow(statusBitsList)) {
         //check already alert generated
