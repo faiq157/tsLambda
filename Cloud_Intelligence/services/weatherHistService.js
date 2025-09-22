@@ -2,6 +2,7 @@ const aws_integration = require("../aws_integration");
 const moment = require("moment-timezone");
 const tzlookup = require("tz-lookup");
 const db = require("../db");
+const { exeQuery } = require("../pg");
 var Handlebars = require("handlebars");
 const utils = require("../utils");
 const {getS3EmailAssetsUrl} = require("../utils/libs/functions");
@@ -11,9 +12,7 @@ const { notificationService } = require("./common/notificationService");
 const { getDeviceTypeNameFromAssetType } = require("../utils/constants");
 
 class WeatherHistService {
-  async handler(client, pgWrite, payload) {
-    this.client = client;
-    this.pgWrite = pgWrite;
+  async handler(payload) {
     this.payload = payload;
     try {
       await this.processEvent();
@@ -42,7 +41,7 @@ class WeatherHistService {
       return false;
     } else {
       info = this.mapSiteInfo(info, siteConf);
-      info.multipleSites = await notificationService.checkProjectSites(this.client,info.project_id);
+      info.multipleSites = await notificationService.checkProjectSites(info.project_id);
       console.log(info);
       console.log(siteConf);
       const wind_speed_threshold = siteConf.wind_speed_threshold;
@@ -137,7 +136,7 @@ class WeatherHistService {
 
   async updateMeta() {
     var json = {};
-    const assetsInfo = await this.client.query(db.assetinfo, [
+    const assetsInfo = await exeQuery(db.assetinfo, [
       this.payload.asset_id,
     ]);
     await assetsInfo.rows.forEach(async (data) => {
@@ -197,7 +196,7 @@ class WeatherHistService {
 
   async getLastWeatherHist() {
     try {
-      const lastWeatherUpdate = await this.client.query(db.lastWeatherHist, [
+      const lastWeatherUpdate = await exeQuery(db.lastWeatherHist, [
         this.payload.asset_id,
         this.payload.timestamp,
       ]);
@@ -213,7 +212,7 @@ class WeatherHistService {
 
   async getSiteThresholdConf() {
     try {
-      const siteConfResult = await this.client.query(db.siteInfoByAssetId, [this.payload.asset_id ]);
+      const siteConfResult = await exeQuery(db.siteInfoByAssetId, [this.payload.asset_id ]);
       return siteConfResult.rows;
     } catch (err) {
       console.error(err);
@@ -306,7 +305,6 @@ class WeatherHistService {
 
       let event_name = this.getEventName(type);
       var userAccounts = await notificationSettingService.getAccounts(
-        this.client,
         info.site_id,
         "ws_inc_repo_" + type.toString().toLowerCase()
       );
@@ -424,7 +422,7 @@ class WeatherHistService {
 
   async getActiveAlert(event_name) {
     try {
-      const checkAlert = await this.client.query(
+      const checkAlert = await exeQuery(
         db.checkCloudAlertByLinkedAsset,
         [this.payload.asset_id, event_name]
       );
@@ -436,7 +434,7 @@ class WeatherHistService {
   }
   async addAlert(event_name, info, threshold, percentage) {
     try {
-      const res = await this.pgWrite.query(db.addFullCloudAlertQuery, [
+      const res = await exeQuery(db.addFullCloudAlertQuery, [
         event_name,
         new Date(this.payload.timestamp),
         this.payload.asset_id,
@@ -445,7 +443,7 @@ class WeatherHistService {
         this.getEventTitle(event_name, info),
         this.getEventICon(event_name),
         this.getEventMessage(event_name, info, threshold, percentage),
-      ]);
+      ], { writer: true });
       console.log("ADD ALERT: ", res);
       return res;
     } catch (err) {
@@ -456,11 +454,11 @@ class WeatherHistService {
 
   async updateActiveAlert(alertId, info, threshold, event_name, percentage) {
     try {
-      const updateAlert = await this.pgWrite.query(db.updateActiveAlert, [
+      const updateAlert = await exeQuery(db.updateActiveAlert, [
         this.getEventMessage(event_name, info, threshold, percentage),
         this.payload.timestamp,
         alertId,
-      ]);
+      ], { writer: true });
       console.log("updateActiveAlert: ", updateAlert);
       return updateAlert;
     } catch (err) {
@@ -474,8 +472,8 @@ class WeatherHistService {
   async clearAlert(alertId) {
     try {
       console.log("Delete Cloud Alert: ", alertId);
-      await cloudAlertService.clearAlertDetail(this.pgWrite, alertId);
-      return await this.pgWrite.query(db.removeCloudAlert, [alertId]);
+      await cloudAlertService.clearAlertDetail(alertId);
+      return await exeQuery(db.removeCloudAlert, [alertId], { writer: true });
     } catch (err) {
       console.error(err);
       throw new Error("Operation not completed error clearAlert..!!", err);
@@ -485,7 +483,7 @@ class WeatherHistService {
   async addEventLog(event_name, info, threshold, percentage) {
     try {
       //name,levelno,created,asset_id,type,title,icon,message
-      const addEventRes = await this.pgWrite.query(
+      const addEventRes = await exeQuery(
         db.addFullCloudEventLogQuery,
         [
           event_name,
@@ -496,7 +494,7 @@ class WeatherHistService {
           this.getEventTitle(event_name, info),
           this.getEventICon(event_name),
           this.getEventMessage(event_name, info, threshold, percentage),
-        ]
+        ], { writer: true }
       );
       console.log("Add event for " + event_name + " :", addEventRes);
     } catch (err) {

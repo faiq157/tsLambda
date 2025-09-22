@@ -33,21 +33,16 @@ const parseFn = val =>
 
 types.setTypeParser(TIMESTAMP_OID, parseFn);
 
-const checkActiveAsset = async (client, payload) => {
+const checkActiveAsset = async (payload) => {
   const asset_id = payload.asset_id || null;
   if (asset_id === null) {
     return true;
   }
-  return assetHelperService.checkIsActive(client, asset_id);
+  return assetHelperService.checkIsActive(asset_id);
 };
 
 const processElasticSearchData = async (payload) => {
-  // const client = new Client(pgConfig);
-  // const pgWrite = new Client(pgMasterConfig);
-
   try {
-    // await client.connect();
-    // await pgWrite.connect();
 
     switch (payload.channel) {
       case "battery_hist":
@@ -58,29 +53,29 @@ const processElasticSearchData = async (payload) => {
         break;
       case "command_status_update":
         console.log("Command Status Update:", payload);
-        if (await checkActiveAsset(client, payload)) {
-          await commandStatusService.handler(client, pgWrite, payload);
+        if (await checkActiveAsset(payload)) {
+          await commandStatusService.handler(payload);
         }
         break;
       case "tracking_command_hist":
         console.log("Tracking Command Hist:", payload);
-        await ncCommandedStateService.handler(client, pgWrite, payload);
+        await ncCommandedStateService.handler(payload);
         if (payload.commanded_state === 5) {
           //send night time stow event to anomaly detection queue
-          await ncCommandedStateService.handleAnomalyDetectionNightTimeStowEvent(client, payload);
+          await ncCommandedStateService.handleAnomalyDetectionNightTimeStowEvent(payload);
         }
         break;
       case "weather_reporting_hist":
         console.log("Weather Reporting Hist:", payload);
-        if (await checkActiveAsset(client, payload)) {
-          await weatherReportingService.handler(client, pgWrite, payload);
+        if (await checkActiveAsset(payload)) {
+          await weatherReportingService.handler(payload);
         }
         break;
       case "weather_hist":
         console.log("Weather Station:", payload);
-        if (await checkActiveAsset(client, payload)) {
-          await weatherHistService.handler(client, pgWrite, payload);
-          await weatherAlarmService.handler(client, pgWrite, payload);
+        if (await checkActiveAsset(payload)) {
+          await weatherHistService.handler(payload);
+          await weatherAlarmService.handler(payload);
         }
         break;
       case "network_controller_connection_hist":
@@ -89,24 +84,24 @@ const processElasticSearchData = async (payload) => {
       case "asset_connection_hist":
         //Send raw data to ES
         //Update the timestamp to last reported to match database fix
-        if (await checkActiveAsset(client, payload)) {
-          const fw_res = await helper.getFirmwareVersion(client, payload);
+        if (await checkActiveAsset(payload)) {
+          const fw_res = await helper.getFirmwareVersion(payload);
           //additional check added if request is from NC then do not process
           if (fw_res.nc_asset_id !== null && fw_res.nc_asset_id === payload.asset_id) {
             console.log("Discarding NC update in assetConnectionStatus");
           } else {
-            await assetConnectionHistService.handler(client, pgWrite, payload);
+            await assetConnectionHistService.handler(payload);
           }
         }
         break;
       case "asset_status_bits_update":
-        if (await checkActiveAsset(client, payload)) {
-          await assetStatusBits.handleAssetStatusBits(client, pgWrite, payload);
+        if (await checkActiveAsset(payload)) {
+          await assetStatusBits.handleAssetStatusBits(payload);
         }
         break;
       case "network_controller_sleep_event":
         //add event log
-        await ncSleepEvent.handleUpdate(pgWrite, payload);
+        await ncSleepEvent.handleUpdate(payload);
         break;
       case "weather_stow_updates":
         if (await checkActiveAsset(client, payload)) {
@@ -123,24 +118,24 @@ const processElasticSearchData = async (payload) => {
       case "local_weather_nc_online":
       //case "local_weather_nc_reboot":   // locally processed
       case "local_weather_nc_stow_update":
-        await accuWeatherService.handler(client, pgWrite, payload);
+        await accuWeatherService.handler(payload);
         break;
       case "anomaly_detection":
-        if (await checkActiveAsset(client, payload)) {
-          await anomalyDetectionService.handler(client, pgWrite, payload);
+        if (await checkActiveAsset(payload)) {
+          await anomalyDetectionService.handler(payload);
         }
         break;
       case "asset_wrong_reporting":
-        if (await checkActiveAsset(client, payload)) {
-          await assetWrongReportingService.handler(client, pgWrite, payload);
+        if (await checkActiveAsset(payload)) {
+          await assetWrongReportingService.handler(payload);
         }
         break;
       case "vegetation_update":
         await vegetationAlertService.handler(payload);
         break;
       case "machine_learning":
-        if (await checkActiveAsset(client, payload)) {
-          await mlNotificationService.handler(client, pgWrite, payload);
+        if (await checkActiveAsset(payload)) {
+          await mlNotificationService.handler(payload);
         }
         break;
       case "asset_preset_update":

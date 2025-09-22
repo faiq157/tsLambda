@@ -2,7 +2,7 @@ const aws_integration = require("../aws_integration");
 const moment = require("moment-timezone");
 const tzlookup = require("tz-lookup");
 const db = require("../db");
-const { getAssetInfoById } = require("../pg");
+const { getAssetInfoById, exeQuery } = require("../pg");
 var Handlebars = require("handlebars");
 const utils = require("../utils");
 const { getS3EmailAssetsUrl, isLinkedRow } = require("../utils/libs/functions");
@@ -178,11 +178,11 @@ SELECT * FROM terrasmart.cloud_alert
 WHERE asset_id = $1 :: UUID AND event_name = $2 :: VARCHAR AND active = true
 ORDER BY created DESC limit 1`;
 
-const addAlert = async (pgWrite, payload, assetInfo, bit, levelNo = 20) => {
+const addAlert = async (payload, assetInfo, bit, levelNo = 20) => {
   let res = null;
   try {
     console.log("Event ===>", EVENT_NAMES[bit]);
-    res = await pgWrite.query(addCloudAlertQuery, [
+    res = await exeQuery(addCloudAlertQuery, [
       assetInfo.device_type === "Network Controller"
         ? "NC-" + EVENT_NAMES[bit]
         : "ASSET-" + EVENT_NAMES[bit],
@@ -193,7 +193,7 @@ const addAlert = async (pgWrite, payload, assetInfo, bit, levelNo = 20) => {
       EVENT_MSG[bit],//await getTitle(assetInfo, EVENT_MSG[bit], payload),
       EVENT_ICONS[bit],
       levelNo
-    ]);
+    ], { writer: true });
   } catch (exception) {
     console.log(EVENT_NAMES[bit] + " Alert Exception: ", exception);
   } finally {
@@ -203,10 +203,10 @@ const addAlert = async (pgWrite, payload, assetInfo, bit, levelNo = 20) => {
   return res;
 };
 
-const addEventLog = async (pgWrite, payload, assetInfo, bit, levelNo = 20) => {
+const addEventLog = async (payload, assetInfo, bit, levelNo = 20) => {
   let res = null;
   try {
-    await pgWrite.query(cloudEventLogQuery, [
+    await exeQuery(cloudEventLogQuery, [
       assetInfo.device_type === "Network Controller"
         ? "NC-" + EVENT_NAMES[bit]
         : "ASSET-" + EVENT_NAMES[bit],
@@ -216,7 +216,7 @@ const addEventLog = async (pgWrite, payload, assetInfo, bit, levelNo = 20) => {
       assetInfo.device_type === "Network Controller" ? 1 : 2,
       await EVENT_MSG[bit],//getTitle(assetInfo, EVENT_MSG[bit], payload),
       EVENT_ICONS[bit],
-    ]);
+    ], { writer: true });
   } catch (exception) {
     console.log(EVENT_NAMES[bit] + " Log Exception: ", exception);
   } finally {
@@ -225,17 +225,17 @@ const addEventLog = async (pgWrite, payload, assetInfo, bit, levelNo = 20) => {
   return res;
 };
 
-const clearAlert = async (pgWrite, payload, alertId) => {
+const clearAlert = async (payload, alertId) => {
   let res = null;
   try {
-    res = await pgWrite.query(db.updateCLoudAlertQuery, [
+    res = await exeQuery(db.updateCLoudAlertQuery, [
       new Date(payload.timestamp),
       alertId,
-    ]);
+    ], { writer: true });
     console.log("Delete Cloud Alert: ", alertId);
-    await cloudAlertService.clearAlertDetail(pgWrite, alertId);
+    await cloudAlertService.clearAlertDetail(alertId);
 
-    res = await pgWrite.query(db.removeCloudAlert, [alertId]);
+    res = await exeQuery(db.removeCloudAlert, [alertId], { writer: true });
     //clear Alert Details
   } catch (exception) {
     console.log("Clear Alert (" + alertId + ") Exception: ", exception);
@@ -245,8 +245,8 @@ const clearAlert = async (pgWrite, payload, alertId) => {
   return res;
 };
 
-const getActiveAlert = async (client, payload, assetInfo, bit) => {
-  return await client.query(checkAlertQuery, [
+const getActiveAlert = async (payload, assetInfo, bit) => {
+  return await exeQuery(checkAlertQuery, [
     payload.asset_id,
     assetInfo.device_type === "Network Controller"
       ? "NC-" + EVENT_NAMES[bit]
@@ -256,8 +256,6 @@ const getActiveAlert = async (client, payload, assetInfo, bit) => {
 
 
 const handleNoCommunicationWithNC = async (
-  client,
-  pgWrite,
   payload,
   assetInfo,
   linkedRowDetails
@@ -266,7 +264,7 @@ const handleNoCommunicationWithNC = async (
   const statusBitsList = statusBits(payload.status_bits);
   let bit = 1;
   //check already alert generated
-  const checkAlert = await getActiveAlert(client, payload, assetInfo, bit);
+  const checkAlert = await getActiveAlert(payload, assetInfo, bit);
   try {
     if (containsNoCommunicationWithNC(statusBitsList)) {
       //if not add new alert else ignore
@@ -318,9 +316,9 @@ const handleNoCommunicationWithNC = async (
           );
         } else {
           //add new alert
-          await addAlert(pgWrite, payload, assetInfo, bit);
+          await addAlert(payload, assetInfo, bit);
           //add event log
-          await addEventLog(pgWrite, payload, assetInfo, bit);
+          await addEventLog(payload, assetInfo, bit);
           assetInfo.status_text = EVENT_MSG[bit];
           assetInfo.timestamp = payload.timestamp;
           if (assetInfo.is_status_bits_notify)
@@ -332,7 +330,7 @@ const handleNoCommunicationWithNC = async (
       //if created flag inactive it
       if (checkAlert.rows.length > 0) {
         //flag it inactive
-        await clearAlert(pgWrite, payload, checkAlert.rows[0].id);
+        await clearAlert(payload, checkAlert.rows[0].id);
       }
     }
   } catch (exception) {
@@ -341,8 +339,6 @@ const handleNoCommunicationWithNC = async (
 };
 
 const handleMotorCurrentHardwareFault = async (
-  client,
-  pgWrite,
   payload,
   assetInfo,
   linkedRowDetails
@@ -351,7 +347,7 @@ const handleMotorCurrentHardwareFault = async (
   const statusBitsList = statusBits(payload.status_bits);
   let bit = 2;
   //check already alert generated
-  const checkAlert = await getActiveAlert(client, payload, assetInfo, bit);
+  const checkAlert = await getActiveAlert(payload, assetInfo, bit);
   try {
     if (containsMotorCurrentHardwareFault(statusBitsList)) {
       //if not add new alert else ignore
@@ -402,9 +398,9 @@ const handleMotorCurrentHardwareFault = async (
           );
         } else {
           //add new alert
-          await addAlert(pgWrite, payload, assetInfo, bit, 30);
+          await addAlert(payload, assetInfo, bit, 30);
           //add event log
-          await addEventLog(pgWrite, payload, assetInfo, bit, 30);
+          await addEventLog(payload, assetInfo, bit, 30);
           assetInfo.status_text = EVENT_MSG[bit];
           assetInfo.timestamp = payload.timestamp;
           if (assetInfo.is_status_bits_notify)
@@ -415,7 +411,7 @@ const handleMotorCurrentHardwareFault = async (
       //if created flag inactive it
       if (checkAlert.rows.length > 0) {
         //flag it inactive
-        await clearAlert(pgWrite, payload, checkAlert.rows[0].id);
+        await clearAlert(payload, checkAlert.rows[0].id);
       }
     }
   } catch (exception) {
@@ -423,12 +419,12 @@ const handleMotorCurrentHardwareFault = async (
   }
 };
 
-const handleMotorFaultTimeout = async (client, pgWrite, payload, assetInfo, linkedRowDetails) => {
+const handleMotorFaultTimeout = async (payload, assetInfo, linkedRowDetails) => {
   console.log("handleMotorFaultTimeout");
   const statusBitsList = statusBits(payload.status_bits);
   let bit = 4;
   //check already alert generated
-  const checkAlert = await getActiveAlert(client, payload, assetInfo, bit);
+  const checkAlert = await getActiveAlert(payload, assetInfo, bit);
   try {
     if (containsMotorFaultTimeout(statusBitsList)) {
       //if not add new alert else ignore
@@ -479,9 +475,9 @@ const handleMotorFaultTimeout = async (client, pgWrite, payload, assetInfo, link
           );
         } else {
         //add new alert
-        await addAlert(pgWrite, payload, assetInfo, bit, 30);
+        await addAlert(payload, assetInfo, bit, 30);
         //add event log
-        await addEventLog(pgWrite, payload, assetInfo, bit, 30);
+        await addEventLog(payload, assetInfo, bit, 30);
         assetInfo.status_text = EVENT_MSG[bit];
         assetInfo.timestamp = payload.timestamp;
         if (assetInfo.is_status_bits_notify)
@@ -492,7 +488,7 @@ const handleMotorFaultTimeout = async (client, pgWrite, payload, assetInfo, link
       //if created flag inactive it
       if (checkAlert.rows.length > 0) {
         //flag it inactive
-        await clearAlert(pgWrite, payload, checkAlert.rows[0].id);
+        await clearAlert(payload, checkAlert.rows[0].id);
       }
     }
   } catch (exception) {
@@ -501,8 +497,6 @@ const handleMotorFaultTimeout = async (client, pgWrite, payload, assetInfo, link
 };
 
 const handleMotorCurrentSoftwareFault = async (
-  client,
-  pgWrite,
   payload,
   assetInfo,
   linkedRowDetails
@@ -511,7 +505,7 @@ const handleMotorCurrentSoftwareFault = async (
   const statusBitsList = statusBits(payload.status_bits);
   let bit = 16;
   //check already alert generated
-  const checkAlert = await getActiveAlert(client, payload, assetInfo, bit);
+  const checkAlert = await getActiveAlert(payload, assetInfo, bit);
   try {
     if (containsMotorCurrentSoftwareFault(statusBitsList)) {
       //check already alert generated
@@ -563,9 +557,9 @@ const handleMotorCurrentSoftwareFault = async (
           );
         } else {
           //add new alert
-          await addAlert(pgWrite, payload, assetInfo, bit, 30);
+          await addAlert(payload, assetInfo, bit, 30);
           //add event log
-          await addEventLog(pgWrite, payload, assetInfo, bit, 30);
+          await addEventLog(payload, assetInfo, bit, 30);
           assetInfo.status_text = EVENT_MSG[bit];
           assetInfo.timestamp = payload.timestamp;
           if (assetInfo.is_status_bits_notify)
@@ -576,7 +570,7 @@ const handleMotorCurrentSoftwareFault = async (
       //if created flag inactive it
       if (checkAlert.rows.length > 0) {
         //flag it inactive
-        await clearAlert(pgWrite, payload, checkAlert.rows[0].id);
+        await clearAlert(payload, checkAlert.rows[0].id);
       }
     }
   } catch (exception) {
@@ -584,8 +578,6 @@ const handleMotorCurrentSoftwareFault = async (
   }
 };
 const handleLowTemperatureRestrictedMovement = async (
-  client,
-  pgWrite,
   payload,
   assetInfo,
   linkedRowDetails
@@ -594,7 +586,7 @@ const handleLowTemperatureRestrictedMovement = async (
   const statusBitsList = statusBits(payload.status_bits);
   let bit = 64;
   //check already alert generated
-  const checkAlert = await getActiveAlert(client, payload, assetInfo, bit);
+  const checkAlert = await getActiveAlert(payload, assetInfo, bit);
   try {
     if (containsLowTemperatureRestrictedMovement(statusBitsList)) {
       //check already alert generated
@@ -646,9 +638,9 @@ const handleLowTemperatureRestrictedMovement = async (
           );
         } else {
           //add new alert
-          await addAlert(pgWrite, payload, assetInfo, bit);
+          await addAlert(payload, assetInfo, bit);
           //add event log
-          await addEventLog(pgWrite, payload, assetInfo, bit);
+          await addEventLog(payload, assetInfo, bit);
           assetInfo.status_text = EVENT_MSG[bit];
           assetInfo.timestamp = payload.timestamp;
           if (assetInfo.is_status_bits_notify)
@@ -659,7 +651,7 @@ const handleLowTemperatureRestrictedMovement = async (
       //if created flag inactive it
       if (checkAlert.rows.length > 0) {
         //flag it inactive
-        await clearAlert(pgWrite, payload, checkAlert.rows[0].id);
+        await clearAlert(payload, checkAlert.rows[0].id);
       }
     }
   } catch (exception) {
@@ -667,12 +659,12 @@ const handleLowTemperatureRestrictedMovement = async (
   }
 };
 
-const handleChargerFault = async (client, pgWrite, payload, assetInfo, linkedRowDetails) => {
+const handleChargerFault = async (payload, assetInfo, linkedRowDetails) => {
   console.log("handleChargerFault");
   const statusBitsList = statusBits(payload.status_bits);
   let bit = 8;
   //check already alert generated
-  const checkAlert = await getActiveAlert(client, payload, assetInfo, bit);
+  const checkAlert = await getActiveAlert(payload, assetInfo, bit);
   try {
     if (containsChargerFault(statusBitsList)) {
       //check already alert generated
@@ -724,9 +716,9 @@ const handleChargerFault = async (client, pgWrite, payload, assetInfo, linkedRow
           );
         } else {
           //add new alert
-          await addAlert(pgWrite, payload, assetInfo, bit);
+          await addAlert(payload, assetInfo, bit);
           //add event log
-          await addEventLog(pgWrite, payload, assetInfo, bit);
+          await addEventLog(payload, assetInfo, bit);
           assetInfo.status_text = EVENT_MSG[bit];
           assetInfo.timestamp = payload.timestamp;
           if (assetInfo.is_status_bits_notify)
@@ -737,7 +729,7 @@ const handleChargerFault = async (client, pgWrite, payload, assetInfo, linkedRow
       //if created flag inactive it
       if (checkAlert.rows.length > 0) {
         //flag it inactive
-        await clearAlert(pgWrite, payload, checkAlert.rows[0].id);
+        await clearAlert(payload, checkAlert.rows[0].id);
       }
     }
   } catch (exception) {
@@ -746,8 +738,6 @@ const handleChargerFault = async (client, pgWrite, payload, assetInfo, linkedRow
 };
 
 const handleLowBatteryAutoStow = async (
-  client,
-  pgWrite,
   payload,
   assetInfo,
   linkedRowDetails
@@ -756,7 +746,7 @@ const handleLowBatteryAutoStow = async (
   const statusBitsList = statusBits(payload.status_bits);
   let bit = 32;
   //check already alert generated
-  const checkAlert = await getActiveAlert(client, payload, assetInfo, bit);
+  const checkAlert = await getActiveAlert(payload, assetInfo, bit);
   try {
     if (containsLowBatteryStow(statusBitsList)) {
       //check already alert generated
@@ -808,9 +798,9 @@ const handleLowBatteryAutoStow = async (
           );
         } else {
           //add new alert
-          await addAlert(pgWrite, payload, assetInfo, bit);
+          await addAlert(payload, assetInfo, bit);
           //add event log
-          await addEventLog(pgWrite, payload, assetInfo, bit);
+          await addEventLog(payload, assetInfo, bit);
           assetInfo.status_text = EVENT_MSG[bit];
           assetInfo.timestamp = payload.timestamp;
           if (assetInfo.is_status_bits_notify)
@@ -821,7 +811,7 @@ const handleLowBatteryAutoStow = async (
       //if created flag inactive it
       if (checkAlert.rows.length > 0) {
         //flag it inactive
-        await clearAlert(pgWrite, payload, checkAlert.rows[0].id);
+        await clearAlert(payload, checkAlert.rows[0].id);
       }
     }
   } catch (exception) {
@@ -829,11 +819,11 @@ const handleLowBatteryAutoStow = async (
   }
 };
 
-const handleEmergencyStop = async (client, pgWrite, payload, assetInfo, linkedRowDetails) => {
+const handleEmergencyStop = async (payload, assetInfo, linkedRowDetails) => {
   console.log("handleEmergencyStop");
   const statusBitsList = statusBits(payload.status_bits);
   const eStopButtonEngaged = containsEmergencyStopStatus(statusBitsList);
-  const assetRes = await getAssetInfoById(client, payload.asset_id);
+  const assetRes = await getAssetInfoById(payload.asset_id);
   let notificationtype = "rc_";
   if (assetInfo.device_type === "Row Controller") notificationtype = "rc_";
   if (assetInfo.device_type === "Weather Station") return // notificationtype = "ws_";
@@ -914,7 +904,7 @@ const handleEmergencyStop = async (client, pgWrite, payload, assetInfo, linkedRo
         notificationsOptions
       );
     } else {
-      const estop_cloud_alert = await client.query(db.getLastCloudAlertQuery, [
+      const estop_cloud_alert = await exeQuery(db.getLastCloudAlertQuery, [
         assetInfo.device_type === "Network Controller"
           ? "NC-ESTOP-Engaged"
           : "ASSET-ESTOP-Engaged",
@@ -922,12 +912,11 @@ const handleEmergencyStop = async (client, pgWrite, payload, assetInfo, linkedRo
       ]);
       console.log("Estop Active Cloud Alert ", estop_cloud_alert.rows);
       if (estop_cloud_alert.rows.length === 0) {
-        const addEstopAlert = await addAlert(pgWrite, payload, assetInfo, 128);
+        const addEstopAlert = await addAlert(payload, assetInfo, 128);
 
         console.log("insertAssetEstopCloudAlert", addEstopAlert);
         // Add cloud Event Logs
         const addEstopEventLog = await addEventLog(
-          pgWrite,
           payload,
           assetInfo,
           128
@@ -963,7 +952,7 @@ const handleEmergencyStop = async (client, pgWrite, payload, assetInfo, linkedRo
         // Inactive the engaged button event
         //get the last row from the db to be marked as inactive
 
-        const nc_estop_cloud_alert = await client.query(
+        const nc_estop_cloud_alert = await exeQuery(
           db.getLastCloudAlertQuery,
           [
             assetInfo.device_type === "Network Controller"
@@ -1051,7 +1040,7 @@ const handleEmergencyStop = async (client, pgWrite, payload, assetInfo, linkedRo
         }
       }else{
            //Remove the cloud alerts for estop if exsists and adding cloud event log
-            const estop_cloud_alert = await client.query(db.getLastCloudAlertQuery, [
+            const estop_cloud_alert = await exeQuery(db.getLastCloudAlertQuery, [
                  "ASSET-ESTOP-Engaged",
               payload.asset_id,
             ]);
@@ -1059,7 +1048,6 @@ const handleEmergencyStop = async (client, pgWrite, payload, assetInfo, linkedRo
             if (estop_cloud_alert.rows.length > 0) {
                 console.log('Clearing asset disangage alerts')
                 const clear_estop_alert = await clearAlert(
-                  pgWrite,
                   payload,
                   estop_cloud_alert.rows[0].id
                 );
@@ -1131,9 +1119,9 @@ const handleEmergencyStop = async (client, pgWrite, payload, assetInfo, linkedRo
     }
   }
 };
-const getUpdateMeta = async (client, asset_id) => {
+const getUpdateMeta = async (asset_id) => {
   console.log("getUpdateMeta ", asset_id);
-  let result = await client.query(db.siteInfoByAssetId, [asset_id]);
+  let result = await exeQuery(db.siteInfoByAssetId, [asset_id]);
   console.log("Res: ", result.rows);
   return result.rows[0];
 };
@@ -1157,20 +1145,18 @@ const mapInfo = async (data) => {
 };
 
 const updateNCCommandedStateAlert = async (
-  client,
-  pgWrite,
   payload,
   updateMeta
 ) => {
   const statusBits = getStatusBit(payload.status_bits);
-  let cloudAlerts = await client.query(
+    let cloudAlerts = await exeQuery(
     `SELECT * FROM terrasmart.cloud_alert WHERE asset_id = $1::UUID AND active = true
     AND event_name = 'NC-COMMANDED-STATE'
    `,
     [updateMeta.network_controller_asset_id]
   );
   console.log("===>", cloudAlerts.rows);
-  const ncCommandedState = await client.query(
+  const ncCommandedState = await exeQuery(
     `
   SELECT * FROM terrasmart.tracking_command_hist
   WHERE network_controller_id = $1::UUID
@@ -1179,7 +1165,7 @@ const updateNCCommandedStateAlert = async (
     [updateMeta.network_controller_id]
   );
   if (payload.status_bits === 0) {
-    const assetsWithActiveAlerts = await client.query(
+    const assetsWithActiveAlerts = await exeQuery(
       `
           SELECT cloud_alert.*
           FROM terrasmart.cloud_alert
@@ -1242,12 +1228,12 @@ const updateNCCommandedStateAlert = async (
         ncCommandedState.rows[0].commanded_state === 5
       ) {
         console.log("ERRORCODE786");
-        await clearAlert(pgWrite, payload, cloudAlerts.rows[0].id);
+        await clearAlert(payload, cloudAlerts.rows[0].id);
       }
     }
   }
   if (cloudAlerts.rows.length === 0) {
-    cloudAlerts = await client.query(db.checkActiveWeatherAlertQuery, [
+    cloudAlerts = await exeQuery(db.checkActiveWeatherAlertQuery, [
       updateMeta.network_controller_id,
     ]);
   }
@@ -1314,17 +1300,17 @@ function getAssetName(info, payload) {
   return info?.asset_name || info?.device_type || "Asset";
 }
 
-exports.handleAssetStatusBits = async function (client, pgWrite, payload) {
+exports.handleAssetStatusBits = async function (payload) {
   try {
     // Get update meta and map asset info
-    const updateMeta = await getUpdateMeta(client, payload.asset_id);
+    const updateMeta = await getUpdateMeta(payload.asset_id);
     const assetInfo = await mapInfo(updateMeta);
 
     // Check if the asset belongs to multiple sites
-    assetInfo.multipleSites = await notificationService.checkProjectSites(client, assetInfo.project_id);
+    assetInfo.multipleSites = await notificationService.checkProjectSites(assetInfo.project_id);
 
     // Retrieve site layout information
-    const { rows: siteLayout } = await client.query(db.siteLayoutInfo, [payload.asset_id]);
+    const { rows: siteLayout } = await exeQuery(db.siteLayoutInfo, [payload.asset_id]);
     const siteLayoutInfo = siteLayout[0] || {};
 
     // Merge additional layout information
@@ -1354,19 +1340,19 @@ exports.handleAssetStatusBits = async function (client, pgWrite, payload) {
     console.log("ASSETINFO: ", assetInfo);
 
     // Retrieve row details linked to the asset
-    const linkedRowDetails = await getAssetAndSiteLayoutByAssetId(client, payload.asset_id);
+    const linkedRowDetails = await getAssetAndSiteLayoutByAssetId(payload.asset_id);
 
     // Call alert-handling functions
-    await updateNCCommandedStateAlert(client, pgWrite, payload, updateMeta);
-    await handleNoCommunicationWithNC(client, pgWrite, payload, assetInfo, linkedRowDetails);
-    await handleLowBatteryAutoStow(client, pgWrite, payload, assetInfo, linkedRowDetails);
-    await handleChargerFault(client, payload, pgWrite, assetInfo, linkedRowDetails);
+    await updateNCCommandedStateAlert(payload, updateMeta);
+        await handleNoCommunicationWithNC(payload, assetInfo, linkedRowDetails);
+    await handleLowBatteryAutoStow(payload, assetInfo, linkedRowDetails);
+    await handleChargerFault(payload, assetInfo, linkedRowDetails);
     
     // Below services are not to be checked for repeaters
     if (assetInfo.repeater_only) return;
 
-    await handleLowTemperatureRestrictedMovement(client, pgWrite, payload, assetInfo, linkedRowDetails);
-    await handleEmergencyStop(client, pgWrite, payload, assetInfo, linkedRowDetails);
+    await handleLowTemperatureRestrictedMovement(payload, assetInfo, linkedRowDetails);
+    await handleEmergencyStop(payload, assetInfo, linkedRowDetails);
 
     // Handle alerts that only require admin contact information
     const assetInfoWithOnlyAdminEmailAndPhones = {
@@ -1375,23 +1361,23 @@ exports.handleAssetStatusBits = async function (client, pgWrite, payload) {
       phoneNumbers: adminPhoneNumbers,
     };
 
-    await handleMotorCurrentSoftwareFault(client, pgWrite, payload, assetInfoWithOnlyAdminEmailAndPhones, linkedRowDetails);
-    await handleMotorFaultTimeout(client, pgWrite, payload, assetInfoWithOnlyAdminEmailAndPhones, linkedRowDetails);
-    await handleMotorCurrentHardwareFault(client, pgWrite, payload, assetInfoWithOnlyAdminEmailAndPhones, linkedRowDetails);
+    await handleMotorCurrentSoftwareFault(payload, assetInfoWithOnlyAdminEmailAndPhones, linkedRowDetails);
+    await handleMotorFaultTimeout(payload, assetInfoWithOnlyAdminEmailAndPhones, linkedRowDetails);
+    await handleMotorCurrentHardwareFault(payload, assetInfoWithOnlyAdminEmailAndPhones, linkedRowDetails);
 
   } catch (error) {
     console.error("Error in handleAssetStatusBits: ", error);
   }
 };
 
-exports.handleChargerFault = async function (client, payload) {
+exports.handleChargerFault = async function (payload) {
   //todo: check if currently there is chargerFault found in last status_bits
-  const updateMeta = await getUpdateMeta(client, payload.asset_id);
+  const updateMeta = await getUpdateMeta(payload.asset_id);
   const assetInfo = await mapInfo(updateMeta);
 
   console.log("ASSETINFO: ", assetInfo);
   const statusBitsList = statusBits(assetInfo.status_bits);
-  await handleChargerFault(client, payload, assetInfo);
+  await handleChargerFault(payload, assetInfo);
 };
 
 const processAssetStatusNotifications = async function (payload, callback) {

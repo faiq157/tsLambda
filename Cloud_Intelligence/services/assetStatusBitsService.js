@@ -1,11 +1,10 @@
 //! THIS FILE IS DEPRECATED AND NOT USED
 const db = require("../db");
 const { getDeviceTypeNameFromAssetType } = require("../utils/constants");
+const { exeQuery } = require("../pg");
 
 class AssetStatusBitsService {
-  async handler(client, pgWrite, payload) {
-    this.client = client;
-    this.pgWrite = pgWrite;
+  async handler(payload) {
     this.payload = payload;
     try {
       // await this.pgWrite.connect();
@@ -73,7 +72,7 @@ class AssetStatusBitsService {
   async getUpdateMeta() {
     try {
       console.log("getUpdateMeta ", this.payload.asset_id);
-      let result = await this.client.query(db.siteInfoByAssetId, [ this.payload.asset_id ]);
+      let result = await exeQuery(db.siteInfoByAssetId, [ this.payload.asset_id ]);
       console.log("Res: ", result.rows);
       return result.rows[0];
     } catch (err) {
@@ -158,7 +157,7 @@ class AssetStatusBitsService {
   }
 
   async getActiveAlert(assetInfo, bit) {
-    return await this.client.query(checkAlertQuery, [
+    return await exeQuery(checkAlertQuery, [
       this.payload.asset_id,
       assetInfo.device_type === "Network Controller"
         ? "NC-" + EVENT_NAMES[bit]

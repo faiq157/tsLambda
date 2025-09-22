@@ -1,6 +1,7 @@
 const moment = require("moment-timezone");
 const tzlookup = require("tz-lookup");
 const db = require("../db");
+const { exeQuery } = require("../pg");
 const Handlebars = require("handlebars");
 const { cloudAlertService } = require("./cloudAlertService");
 const { notificationSettingService } = require("./notificationSettingService");
@@ -15,9 +16,7 @@ const { WeatherForecastStowModel } = require("../models/weatherForecastStow.mode
 const { StowTypes, StowStates, deviceTypeNames } = require("../utils/constants");
 
 class AccuWeatherService {
-  async handler(client, pgWrite, payload) {
-    this.client = client;
-    this.pgWrite = pgWrite;
+  async handler(payload) {
     this.payload = Object.assign({}, payload);  // Copy object
     try {
       this.prepare_event();
@@ -45,7 +44,7 @@ class AccuWeatherService {
   }
 
   async processNCEvent() {
-    let site_stow_info = await this.client.query(db.site_stow_nc_id, [
+    let site_stow_info = await exeQuery(db.site_stow_nc_id, [
       this.payload.network_controller_id
     ]);
     if (!site_stow_info || site_stow_info.rows.length === 0) {
@@ -105,11 +104,11 @@ class AccuWeatherService {
     //todo add endtime older than 24 hours check if required
     //check active cloud alter with stow type
     if (info.stow_type !== null && info.stow_type !== StowTypes.HAIL_STOW) {
-      const cloudAlert = await this.pgWrite.query(db.cloudAlertsForNC,
+      const cloudAlert = await exeQuery(db.cloudAlertsForNC,
         [this.payload.network_controller_id, this.getPendingAlertsEventNames(info.stow_type)]);
       // delete cloud alert after logging
       if (cloudAlert.rows.length !== 0) {
-        const deleteAlert = await this.pgWrite.query(db.removeCloudAlert, [cloudAlert.rows[0].id]); 
+        const deleteAlert = await exeQuery(db.removeCloudAlert, [cloudAlert.rows[0].id], { writer: true }); 
         console.log(`handleOlderAlarmsPendingAlerts/deleteAlert: `, deleteAlert);
       }
     }
@@ -200,11 +199,11 @@ class AccuWeatherService {
       this.is_stow(info),
       info.id
       ]);
-      let res = await this.pgWrite.query(db.site_stow_update, [
+      let res = await exeQuery(db.site_stow_update, [
         this.is_stow_cmd_pending(info) ? info.state + 1 : info.state,
         this.is_stow(info),
         info.id
-      ]);
+      ], { writer: true });
       if (!res || res.rowCount != 1) {
         console.log("ACW: Failed site stow update", res);
       }
@@ -237,8 +236,6 @@ class AccuWeatherService {
     }
     console.log("send_weather_stow_update:", params);
     await weatherStowService.handler(
-      this.client,
-      this.pgWrite,
       params
     );
   }
@@ -352,7 +349,7 @@ class AccuWeatherService {
         const cloudAlert = await this.getActiveCloudAlert();
         console.log(`WeatherEvent: ${this.isWeatherEvent()} cleared: ${this.isWeatherEventCleared()} cloudAlert ${cloudAlert.rows.length}`);
 
-        const activeHailStow = await WeatherForecastStowModel.getActiveWeatherForecastStowBySiteId(this.client, eventMeta.site_id, StowTypes.HAIL_STOW, true)
+        const activeHailStow = await WeatherForecastStowModel.getActiveWeatherForecastStowBySiteId(eventMeta.site_id, StowTypes.HAIL_STOW, true)
         
         // If hail stow already in progress, and new stow is not Weather_Forecast-Avg_Wind, then ignore this event.
         const isThisWindStow = this.payload?.alarm?.stow_type === StowTypes.AVG_WIND || this.payload?.alarm?.stow_type === StowTypes.WIND_GUST
@@ -361,7 +358,7 @@ class AccuWeatherService {
           return
         } else if (isThisWindStow && activeHailStow) {
           // if site is already in hail stow and upcoming site mode is avg wind then mark hail stow inactive 
-          await WeatherForecastStowModel.updateWeatherForecastStow(this.pgWrite, eventMeta.site_id, StowTypes.HAIL_STOW, { active: false, state: StowStates.ENDED })
+          await WeatherForecastStowModel.updateWeatherForecastStow(eventMeta.site_id, StowTypes.HAIL_STOW, { active: false, state: StowStates.ENDED })
         }
 
         if (!moment(this.payload?.start?.when).isSame(this.payload?.end?.when) || this.isWeatherEventCleared()) {
@@ -415,7 +412,7 @@ class AccuWeatherService {
   async handleWeatherAutoStow(eventMeta, cloudAlert) {
     let result;
     const org_payload_ts = this.payload.timestamp;
-    result = await this.client.query(db.site_stow_site_id, [eventMeta.site_id]);
+    result = await exeQuery(db.site_stow_site_id, [eventMeta.site_id]);
     if (!result.rowCount) {
       console.log("ACW: Failed to get site_stow_site_id", result);
     } else {
@@ -455,11 +452,11 @@ class AccuWeatherService {
             this.payload.alarm.timestamp, hide_at_project_level || false
           ]);
 
-          result = await this.pgWrite.query(db.site_stow_updateFull(state), [eventMeta.asset_id, result.rows[0].id, this.payload.timestamp,
+          result = await exeQuery(db.site_stow_updateFull(state), [eventMeta.asset_id, result.rows[0].id, this.payload.timestamp,
               (state === 12) ? false : true, state, this.payload.alarm.stow_type, this.payload.start.when, this.payload.end.when, this.payload.alarm.start.when,
               this.payload.alarm.end.when, this.payload.alarm.start.value, this.payload.alarm.start.threshold, this.payload.alarm.text,
               this.payload.alarm.timestamp, hide_at_project_level || false
-          ]);
+          ], { writer: true });
 
       } else {
 
@@ -481,11 +478,11 @@ class AccuWeatherService {
             this.payload.alarm.hide_at_project_level
           ]);
 
-          result = await this.pgWrite.query(db.site_stow_insert, [eventMeta.asset_id, eventMeta.site_id, this.payload.timestamp,
+          result = await exeQuery(db.site_stow_insert, [eventMeta.asset_id, eventMeta.site_id, this.payload.timestamp,
               true, state, this.payload.alarm.stow_type, this.payload.start.when, this.payload.end.when, this.payload.alarm.start.when,
               this.payload.alarm.end.when, this.payload.alarm.start.value, this.payload.alarm.start.threshold, this.payload.alarm.text,
               this.payload.alarm.timestamp, this.payload.alarm.hide_at_project_level
-          ]);
+          ], { writer: true });
 
       }
         if (!result || result.rowCount != 1) {
@@ -794,8 +791,8 @@ class AccuWeatherService {
   async clearAlert(alertId) {
     try {
       console.log("Delete Cloud Alert: ", alertId);
-      await cloudAlertService.clearAlertDetail(this.pgWrite, alertId, false);
-      return await this.pgWrite.query(db.removeCloudAlert, [alertId]);
+      await cloudAlertService.clearAlertDetail(alertId, false);
+      return await exeQuery(db.removeCloudAlert, [alertId], { writer: true });
     } catch (err) {
       console.error("Error In clearAlert.. ", err);
       throw new Error("Error In clearAlert.. ", err);
@@ -824,7 +821,7 @@ class AccuWeatherService {
         ),
         params_str
       ]);
-      return await this.pgWrite.query(db.addCloudAlertParamsQuery, [
+      return await exeQuery(db.addCloudAlertParamsQuery, [
         this.getEventNames(this.payload.stow_type, isActive),
         this.payload.timestamp,
         this.payload.asset_id,
@@ -838,7 +835,7 @@ class AccuWeatherService {
           info
         ),
         params_str
-      ]);
+      ], { writer: true });
     } catch (err) {
       console.error("ERR:", err);
       throw new Error("Error In addCloudAlert.. ", err);
@@ -892,7 +889,7 @@ class AccuWeatherService {
         console.log(`Not updating no change in message and params`);
         return false;
       }
-      await this.pgWrite.query(db.updateActiveAlertParams, [
+      await exeQuery(db.updateActiveAlertParams, [
         this.getMessage(
           this.payload.stow_type,
           isActive,
@@ -903,7 +900,7 @@ class AccuWeatherService {
         this.getIcons(isActive),
         new_params,
         activeAlert.id
-      ]);
+      ], { writer: true });
       return true;
     } catch (err) {
       console.error("Err", err);
@@ -979,7 +976,7 @@ class AccuWeatherService {
           info
         )
       ]);
-      const res = await this.pgWrite.query(db.addFullCloudEventLogQuery, [
+      const res = await exeQuery(db.addFullCloudEventLogQuery, [
         this.getEventNames(this.payload.stow_type, isActive),
         20,
         this.payload.timestamp,
@@ -992,7 +989,7 @@ class AccuWeatherService {
           isActive,
           info
         )
-      ]);
+      ], { writer: true });
       console.log("res ", res);
       return res;
     } catch (err) {
@@ -1030,7 +1027,7 @@ class AccuWeatherService {
   async get_project_sites() {
     try {
       let sites = [];
-      const res = await this.client.query(db.projectSites, [
+      const res = await exeQuery(db.projectSites, [
         this.payload.prj_data.id
       ]);
       if (res && res.rows.length) {
@@ -1046,7 +1043,7 @@ class AccuWeatherService {
     try {
       let assetsInfoByAddr;
       if ("site_data" in this.payload) {
-        assetsInfoByAddr = await this.client.query(db.metaInfoBySiteId, [
+        assetsInfoByAddr = await exeQuery(db.metaInfoBySiteId, [
           this.payload.site_data.id
         ]);
         
@@ -1074,7 +1071,7 @@ class AccuWeatherService {
         // console.log("-----------------------------------", db.metaInfoByNCId, [
         //   this.payload.network_controller_id
         // ]);
-        assetsInfoByAddr = await this.client.query(db.metaInfoByNCId, [
+        assetsInfoByAddr = await exeQuery(db.metaInfoByNCId, [
           this.payload.network_controller_id
         ]);
       }
@@ -1106,7 +1103,7 @@ class AccuWeatherService {
           info.location_lat = data.location_lat;
           info.location_lng = data.location_lng;
         }
-        info.multipleSites = await notificationService.checkProjectSites(this.client, info.project_id);
+        info.multipleSites = await notificationService.checkProjectSites(info.project_id);
         this.payload.device_type = info.device_type;
         this.payload.asset_id = info.asset_id;
         info.commanded_state = data.commanded_state;
@@ -1126,12 +1123,12 @@ class AccuWeatherService {
       console.log(`getActiveCloudAlert: stow_type: ${this.payload.stow_type} alert_type: ${this.alert_type}`);
       if (this.payload.stow_type === "Weather_Forecast_Alert-xyz" && this.alert_type === "Clear_All") {
         console.log("Weather_Forecast_Alert-xyz", db.checkMatchingCloudAlert("Weather_Forecast_Alert-"));
-        return await this.client.query(db.checkMatchingCloudAlert("Weather_Forecast_Alert-"), [
+        return await exeQuery(db.checkMatchingCloudAlert("Weather_Forecast_Alert-"), [
           this.payload.asset_id
         ]);
       } else {
         console.log(`getActiveCloudAlert: eventName: ${this.getEventNames(this.payload.stow_type, true)}`);
-        return await this.client.query(db.checkCloudAlert, [
+        return await exeQuery(db.checkCloudAlert, [
           this.payload.asset_id,
           this.getEventNames(this.payload.stow_type, true)
         ]);
@@ -1435,7 +1432,6 @@ class AccuWeatherService {
       notificationType = "accuweather_stow";
 
     const userAccounts = await notificationSettingService.getAccounts(
-      this.client,
       info.site_id,
       notificationType
     );

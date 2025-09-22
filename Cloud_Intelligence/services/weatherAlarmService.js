@@ -2,6 +2,7 @@ const aws_integration = require("../aws_integration");
 const moment = require("moment-timezone");
 const tzlookup = require("tz-lookup");
 const db = require("../db");
+const { exeQuery } = require("../pg");
 var Handlebars = require("handlebars");
 const utils = require("../utils");
 const { acquireLock } = require("../utils/libs/execSync");
@@ -13,9 +14,7 @@ const { notificationService } = require("./common/notificationService");
 const {getProjectDetailsBySiteId} = require("../models/project.model");
 
 class WeatherAlarmService {
-  async handler(client, pgWrite, payload) {
-    this.client = client;
-    this.pgWrite = pgWrite;
+  async handler(payload) {
     this.payload = payload;
     try {
       return await this.processEvent();
@@ -37,11 +36,11 @@ class WeatherAlarmService {
 
     if (info.device_type === 'Weather Station' && info.repeater_only === false) {
       //identify time period to get weather information for comparison
-      let windAlarm = new WindAlarm(this.client, this.payload.asset_id);
+      let windAlarm = new WindAlarm(this.payload.asset_id);
       let isActiveAlarm = await windAlarm.sendNotifications();
       if (isActiveAlarm) {
         const {site_id} = this.payload;
-        const project = await getProjectDetailsBySiteId(this.client, site_id);
+        const project = await getProjectDetailsBySiteId(site_id);
         const {is_in_construction} = project;
         isActiveAlarm = !is_in_construction;
       }
@@ -55,10 +54,10 @@ class WeatherAlarmService {
 
   async updateMeta() {
     var json = {};
-    const assetsInfo = await this.client.query(db.assetinfo, [
+    const assetsInfo = await exeQuery(db.assetinfo, [
       this.payload.asset_id,
     ]);
-    const siteInfo = await this.client.query(db.siteInfoWS, [
+    const siteInfo = await exeQuery(db.siteInfoWS, [
       this.payload.asset_id,
     ]);
 
@@ -91,7 +90,7 @@ class WeatherAlarmService {
       json.location_lat = siteInfo.rows[0].location_lat;
       json.location_lng = siteInfo.rows[0].location_lng;
     }
-    json.multipleSites = await notificationService.checkProjectSites(this.client, json.project_id);
+    json.multipleSites = await notificationService.checkProjectSites(json.project_id);
     console.log(json);
     return json;
   }
@@ -137,7 +136,6 @@ class WeatherAlarmService {
     try {
       let event_name = "Ws_Frozen";
       var userAccounts = await notificationSettingService.getAccounts(
-        this.client,
         info.site_id,
         "ws_frozen"
       );
@@ -188,7 +186,7 @@ class WeatherAlarmService {
 
   async getActiveAlert(event_name) {
     try {
-      const checkAlert = await this.client.query(db.checkCloudAlert, [
+      const checkAlert = await exeQuery(db.checkCloudAlert, [
         this.payload.asset_id,
         event_name,
       ]);
@@ -201,7 +199,7 @@ class WeatherAlarmService {
 
   async addAlert(event_name, info, isActiveAlarm) {
     try {
-      const res = await this.pgWrite.query(db.addFullCloudAlertQuery, [
+      const res = await exeQuery(db.addFullCloudAlertQuery, [
         event_name,
         new Date(this.payload.timestamp),
         this.payload.asset_id,
@@ -210,7 +208,7 @@ class WeatherAlarmService {
         this.getEventTitle(info, isActiveAlarm),
         this.getEventICon(isActiveAlarm),
         this.getEventMessage(info, isActiveAlarm),
-      ]);
+      ], { writer: true });
       console.log("ADD ALERT: ", res);
       return res;
     } catch (err) {
@@ -222,8 +220,8 @@ class WeatherAlarmService {
   async clearAlert(alertId) {
     try {
       console.log("Delete Cloud Alert: ", alertId);
-      await cloudAlertService.clearAlertDetail(this.pgWrite, alertId);
-      return await this.pgWrite.query(db.removeCloudAlert, [alertId]);
+      await cloudAlertService.clearAlertDetail(alertId);
+      return await exeQuery(db.removeCloudAlert, [alertId], { writer: true });
     } catch (err) {
       console.error(err);
       throw new Error("Operation not completed error clearAlert..!!", err);
@@ -232,7 +230,7 @@ class WeatherAlarmService {
   async addEventLog(event_name, info, isActiveAlarm) {
     try {
       //name,levelno,created,asset_id,type,title,icon,message
-      const addEventRes = await this.pgWrite.query(
+      const addEventRes = await exeQuery(
         db.addFullCloudEventLogQuery,
         [
           event_name,
@@ -243,7 +241,7 @@ class WeatherAlarmService {
           this.getEventTitle(info, isActiveAlarm),
           this.getEventICon(isActiveAlarm),
           this.getEventMessage(info, isActiveAlarm),
-        ]
+        ], { writer: true }
       );
       console.log("Add event for " + event_name + " :", addEventRes);
     } catch (err) {

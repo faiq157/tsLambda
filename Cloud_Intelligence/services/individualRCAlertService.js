@@ -1,25 +1,23 @@
 const db = require("../db");
 const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
-
+const { exeQuery } = require("../pg");
 
 const s3 = new S3Client();
 
 class IndividualRCAlertService {
-  async handler(client, pgWrite, payload) {
-    this.client = client;
-    this.pgWrite = pgWrite;
+  async handler(payload) {
     this.payload = payload;
     console.log("Updating status on angle change..!", payload);
 
     try {
       // if (payload.current_angle === payload.requested_angle) {
       const query = db.getIndividualRCActiveAction;
-      let result = await client.query(query, [payload.asset_id]);
+      let result = await exeQuery(query, [payload.asset_id]);
       result = result.rows[0];
       if (result && result.last_action_completed === false) {
-        result = await pgWrite.query(db.updateIndividualRCCompletionStatus, [
+        result = await exeQuery(db.updateIndividualRCCompletionStatus, [
           payload.asset_id,
-        ]);
+        ], { writer: true });
       }
       // }
     } catch (err) {
@@ -31,11 +29,11 @@ class IndividualRCAlertService {
     }
   }
 
-  async updateCommandStatus(args, client, pgWrite) {
+  async updateCommandStatus(args) {
     console.log("Manual Control stopped with args: ", args);
     try {
       console.log("Finding asset..!");
-      const asset = await this.getAssetDetails(args.assetId, client);
+      const asset = await this.getAssetDetails(args.assetId);
       console.log("Got this asset: ", asset);
 
       if (asset && asset.commanded_state === 0) {
@@ -49,9 +47,10 @@ class IndividualRCAlertService {
         // await this.removeS3Object(args, client, file, asset);
 
         // if (file) {
-        const result = await pgWrite.query(
+        const result = await exeQuery(
           db.updateIndividualRCCompletionStatus,
-          [args.timestamp, args.assetId]
+          [args.timestamp, args.assetId],
+          { writer: true }
         );
         console.log("Updating DB got this: ", result);
         // }
@@ -60,15 +59,13 @@ class IndividualRCAlertService {
       }
     } catch (err) {
       console.error(err);
-      await client.end();
-      await pgWrite.end();
       throw new Error("Error in updateCommandStatus..!!", err);
     }
   }
 
-  async removeS3Object(args, client, file, asset) {
+  async removeS3Object(args, file, asset) {
     console.log("Inside removeS3Object..!", args, file, asset);
-    const currentStatus = await this.getCurrentStatus(args, client, asset);
+    const currentStatus = await this.getCurrentStatus(args, asset);
     console.log("currentStatus: ", currentStatus);
     const fileData = this.getS3BucketAndFileName(asset);
     if (currentStatus.reporting === "ONLINE" && file) {
@@ -95,17 +92,17 @@ class IndividualRCAlertService {
       .promise();
   }
 
-  async getCurrentStatus(args, client, asset) {
+  async getCurrentStatus(args, asset) {
     const query = db.getCurrentStatus;
 
-    const result = await client.query(query, [args.assetId]);
+    const result = await exeQuery(query, [args.assetId]);
 
     return result.rows[0];
   }
 
-  async getAssetDetails(assetId, client) {
+  async getAssetDetails(assetId) {
     const query = db.getAssetDetails;
-    let result = await client.query(query, [assetId]);
+    let result = await exeQuery(query, [assetId]);
 
     console.log("Result is: ", result.rows);
 
@@ -151,9 +148,9 @@ class IndividualRCAlertService {
     return { filePath, bucket };
   }
 
-  async updatePresetActions(client, pgWrite, args) {
+  async updatePresetActions(args) {
     console.log("updatePresetActions called with: ", args);
-    let result = await client.query(db.getAssetCommand, [args.asset_id]);
+    let result = await exeQuery(db.getAssetCommand, [args.asset_id]);
 
     console.log("Got following data after querying DB: ", result.rows);
 
@@ -165,9 +162,9 @@ class IndividualRCAlertService {
         (result.individual_rc_cmd_state === 1 && args.panel_command_state === 1)
       ) {
         console.log("Marking status as completed..!");
-        result = await pgWrite.query(db.updateIndividualRCCompletionStatus, [
+        result = await exeQuery(db.updateIndividualRCCompletionStatus, [
           args.asset_id,
-        ]);
+        ], { writer: true });
       }
     }
   }

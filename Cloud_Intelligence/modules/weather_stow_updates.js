@@ -8,15 +8,16 @@ const utils = require("../utils");
 const { getS3EmailAssetsUrl } = require("../utils/libs/functions");
 const { notificationService } = require("../services/common/notificationService");
 const { getDeviceTypeNameFromAssetType } = require("../utils/constants");
+const { exeQuery } = require("../pg");
 
-exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
+exports.handleWeatherStowUpdates = async function (payload) {
   console.log("Weather Stow Updates ", payload);
   // await pgWrite.connect();
   let assetsInfoByAddr = null;
   if (payload.stow_type === 5) {
-    assetsInfoByAddr = await client.query(db.siteInfoByNCAssetId, [ payload.asset_id ]);
+    assetsInfoByAddr = await exeQuery(db.siteInfoByNCAssetId, [ payload.asset_id ]);
   } else {
-    assetsInfoByAddr = await client.query(db.siteInfoByAssetId, [ payload.asset_id ]);
+    assetsInfoByAddr = await exeQuery(db.siteInfoByAssetId, [ payload.asset_id ]);
   }
 
   let weatherJson = {};
@@ -35,7 +36,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
           : "ASSET";
     if (weatherJson.device_type === "Row Controller") {
       //get site_layout info
-      var siteLayoutInfo = await client.query(
+      var siteLayoutInfo = await exeQuery(
         `
       SELECT site_layout.name,site_layout.i,site_layout.shorthand_name FROM terrasmart.site_layout
       WHERE site_layout.asset_id = $1::UUID
@@ -181,7 +182,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
           const updateExistingEventLog = `
             UPDATE terrasmart.cloud_event_log SET title = $1::VARCHAR, message = $2::TEXT, created = $3::TIMESTAMP 
             WHERE id = $4::UUID`;
-          await pgWrite.query(updateExistingEventLog, [
+          await exeQuery(updateExistingEventLog, [
             "Weather Stow: High Wind Gust detected by " + payload.asset_name,
             message,
             new Date(payload.timestamp),
@@ -189,7 +190,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
           ]);
         } else {
           //Add cloud event log
-          let addcloudEventLogResult = await pgWrite.query(cloudEventLogQuery, [
+          let addcloudEventLogResult = await exeQuery(cloudEventLogQuery, [
             "Weather_Stow_Wind_Gust",
             message,
             20,
@@ -203,7 +204,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
         }
       } else {
         //Add cloud event log
-        let addcloudEventLogResult = await pgWrite.query(cloudEventLogQuery, [
+        let addcloudEventLogResult = await exeQuery(cloudEventLogQuery, [
           "Weather_Stow_Wind_Gust",
           message,
           20,
@@ -228,7 +229,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
       if (percentage >= 75) {
         //check if alert is already in place or not
         if (checkAlert.rows.length === 0) {
-          let addcloudAlertResult = await pgWrite.query(addCloudAlertQuery, [
+          let addcloudAlertResult = await exeQuery(addCloudAlertQuery, [
             "Weather_Stow_Wind_Gust",
             message,
             new Date(payload.timestamp),
@@ -277,14 +278,14 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
         if (checkAlert.rows.length > 0) {
           //flag it inactive
           console.log("Delete Cloud Alert: ", checkAlert.rows[0].id);
-          const detailRemoveRes = await this.pgWrite.query(
+          const detailRemoveRes = await exeQuery(
             `
           Delete from terrasmart.cloud_alert_detail
           WHERE cloud_alert_detail.cloud_alert_id = $1::UUID`,
             [checkAlert.rows[0].id]
           );
           console.log("DetailRemoveRes ", detailRemoveRes);
-          await pgWrite.query(db.removeCloudAlert, [checkAlert.rows[0].id]);
+          await exeQuery(db.removeCloudAlert, [checkAlert.rows[0].id], { writer: true });
           // await pgWrite.query(db.updateCLoudAlertQuery, [
           //   new Date(),
           //   checkAlert.rows[0].id,
@@ -324,7 +325,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
           const updateExistingEventLog = `
             UPDATE terrasmart.cloud_event_log SET title = $1::VARCHAR, message = $2::TEXT, created = $3::TIMESTAMP 
             WHERE id = $4::UUID`;
-          await pgWrite.query(updateExistingEventLog, [
+          await exeQuery(updateExistingEventLog, [
             "Weather Stow: High Average Wind Speed detected by " +
             payload.asset_name,
             messageAvgWind,
@@ -333,7 +334,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
           ]);
         } else {
           //Add cloud event log
-          let addcloudEventLogResult = await pgWrite.query(cloudEventLogQuery, [
+          let addcloudEventLogResult = await exeQuery(cloudEventLogQuery, [
             "Weather_Stow_Avg_Wind",
             messageAvgWind,
             20,
@@ -348,7 +349,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
         }
       } else {
         //Add cloud event log
-        let addcloudEventLogResult = await pgWrite.query(cloudEventLogQuery, [
+        let addcloudEventLogResult = await exeQuery(cloudEventLogQuery, [
           "Weather_Stow_Avg_Wind",
           messageAvgWind,
           20,
@@ -375,7 +376,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
       if (percentage >= 75) {
         //check if alert is already in place or not
         if (checkAlert.rows.length === 0) {
-          let addcloudAlertResult = await pgWrite.query(addCloudAlertQuery, [
+          let addcloudAlertResult = await exeQuery(addCloudAlertQuery, [
             "Weather_Stow_Avg_Wind",
             messageAvgWind,
             new Date(payload.timestamp),
@@ -422,14 +423,14 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
         if (checkAlert.rows.length > 0) {
           //flag it inactive
           console.log("Delete Cloud Alert: ", checkAlert.rows[0].id);
-          const detailRemoveRes = await this.pgWrite.query(
+          const detailRemoveRes = await exeQuery(
             `
           Delete from terrasmart.cloud_alert_detail
           WHERE cloud_alert_detail.cloud_alert_id = $1::UUID`,
             [checkAlert.rows[0].id]
           );
           console.log("DetailRemoveRes ", detailRemoveRes);
-          await pgWrite.query(db.removeCloudAlert, [checkAlert.rows[0].id]);
+          await exeQuery(db.removeCloudAlert, [checkAlert.rows[0].id], { writer: true });
           // await pgWrite.query(db.updateCLoudAlertQuery, [
           //   new Date(payload.timestamp),
           //   checkAlert.rows[0].id,
@@ -470,7 +471,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
           const updateExistingEventLog = `
             UPDATE terrasmart.cloud_event_log SET title = $1::VARCHAR, message = $2::TEXT, created = $3::TIMESTAMP 
             WHERE id = $4::UUID`;
-          await pgWrite.query(updateExistingEventLog, [
+          await exeQuery(updateExistingEventLog, [
             "Weather Stow: Deep snow detected by " + payload.asset_name,
             messageDeepSnow,
             new Date(payload.timestamp),
@@ -478,7 +479,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
           ]);
         } else {
           //Add cloud event log
-          let addcloudEventLogResult = await pgWrite.query(cloudEventLogQuery, [
+          let addcloudEventLogResult = await exeQuery(cloudEventLogQuery, [
             "Weather_Stow_Deep_Snow",
             messageDeepSnow,
             20,
@@ -492,7 +493,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
         }
       } else {
         //Add cloud event log
-        let addcloudEventLogResult = await pgWrite.query(cloudEventLogQuery, [
+        let addcloudEventLogResult = await exeQuery(cloudEventLogQuery, [
           "Weather_Stow_Deep_Snow",
           messageDeepSnow,
           20,
@@ -519,7 +520,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
       // if (percentage >= 75) {
       //check if alert is already in place or not
       if (checkAlert.rows.length === 0) {
-        let addcloudAlertResult = await pgWrite.query(addCloudAlertQuery, [
+        let addcloudAlertResult = await exeQuery(addCloudAlertQuery, [
           "Weather_Stow_Deep_Snow",
           messageDeepSnow,
           new Date(payload.timestamp),
@@ -603,7 +604,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
           const updateExistingEventLog = `
             UPDATE terrasmart.cloud_event_log SET title = $1::VARCHAR, message = $2::TEXT, created = $3::TIMESTAMP 
             WHERE id = $4::UUID`;
-          await pgWrite.query(updateExistingEventLog, [
+          await exeQuery(updateExistingEventLog, [
             "Weather Stow: Deep Panel Snow is detected by " +
             payload.asset_name,
             messageDeepPanelSnow,
@@ -612,7 +613,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
           ]);
         } else {
           //Add cloud event log
-          let addcloudEventLogResult = await pgWrite.query(cloudEventLogQuery, [
+          let addcloudEventLogResult = await exeQuery(cloudEventLogQuery, [
             "Weather_Stow_Deep_Panel_Snow",
             messageDeepPanelSnow,
             20,
@@ -627,7 +628,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
         }
       } else {
         //Add cloud event log
-        let addcloudEventLogResult = await pgWrite.query(cloudEventLogQuery, [
+        let addcloudEventLogResult = await exeQuery(cloudEventLogQuery, [
           "Weather_Stow_Deep_Panel_Snow",
           messageDeepPanelSnow,
           20,
@@ -654,7 +655,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
       if (percentage >= 75) {
         //check if alert is already in place or not
         if (checkAlert.rows.length === 0) {
-          let addcloudAlertResult = await pgWrite.query(addCloudAlertQuery, [
+          let addcloudAlertResult = await exeQuery(addCloudAlertQuery, [
             "Weather_Stow_Deep_Panel_Snow",
             messageDeepPanelSnow,
             new Date(payload.timestamp),
@@ -700,14 +701,14 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
         if (checkAlert.rows.length > 0) {
           //flag it inactive
           console.log("Delete Cloud Alert: ", checkAlert.rows[0].id);
-          const detailRemoveRes = await this.pgWrite.query(
+          const detailRemoveRes = await exeQuery(
             `
           Delete from terrasmart.cloud_alert_detail
           WHERE cloud_alert_detail.cloud_alert_id = $1::UUID`,
             [checkAlert.rows[0].id]
           );
           console.log("DetailRemoveRes ", detailRemoveRes);
-          await pgWrite.query(db.removeCloudAlert, [checkAlert.rows[0].id]);
+          await exeQuery(db.removeCloudAlert, [checkAlert.rows[0].id], { writer: true });
           // await client.query(db.updateCLoudAlertQuery, [
           //   new Date(payload.timestamp),
           //   checkAlert.rows[0].id,
@@ -744,7 +745,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
           const updateExistingEventLog = `
             UPDATE terrasmart.cloud_event_log SET title = $1::VARCHAR, message = $2::TEXT, created = $3::TIMESTAMP 
             WHERE id = $4::UUID`;
-          await pgWrite.query(updateExistingEventLog, [
+          await exeQuery(updateExistingEventLog, [
             "Weather Stow due to Weather Station Connectivity",
             messageNoWeatherStation,
             new Date(payload.timestamp),
@@ -752,7 +753,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
           ]);
         } else {
           //Add cloud event log
-          let addcloudEventLogResult = await pgWrite.query(cloudEventLogQuery, [
+          let addcloudEventLogResult = await exeQuery(cloudEventLogQuery, [
             "Weather_Stow_No_Weather_Station",
             messageNoWeatherStation,
             20,
@@ -766,7 +767,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
         }
       } else {
         //Add cloud event log
-        let addcloudEventLogResult = await pgWrite.query(cloudEventLogQuery, [
+        let addcloudEventLogResult = await exeQuery(cloudEventLogQuery, [
           "Weather_Stow_No_Weather_Station",
           messageNoWeatherStation,
           20,
@@ -789,7 +790,7 @@ exports.handleWeatherStowUpdates = async function (client, pgWrite, payload) {
 
       //check if alert is already in place or not
       if (checkAlert.rows.length === 0) {
-        let addcloudAlertResult = await pgWrite.query(addCloudAlertQuery, [
+        let addcloudAlertResult = await exeQuery(addCloudAlertQuery, [
           "Weather_Stow_No_Weather_Station",
           messageNoWeatherStation,
           new Date(payload.timestamp),
@@ -962,14 +963,14 @@ async function addCloudAlertAndEventLogDetail(
     query = query.slice(0, -2);
     // console.log(`LOGQUERY:  ${query}`);
 
-    let inf = await pgWrite.query(query, [payload.timestamp]);
+    let inf = await exeQuery(query, [payload.timestamp]);
     console.log(`LOGQUERYRES:  ${inf}`);
 
     if (cloudAlertId) {
       cloudAlertQuery = cloudAlertQuery.slice(0, -2);
       // console.log(`ALERTQUERY: ${cloudAlertQuery}`);
 
-      let inf1 = await pgWrite.query(cloudAlertQuery, [payload.timestamp]);
+      let inf1 = await exeQuery(cloudAlertQuery, [payload.timestamp], { writer: true });
       console.log(`ALERTQUERYRES:  ${inf1}`);
     }
   }
