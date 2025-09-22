@@ -36,6 +36,7 @@ class AssetStatusBitsService {
       await handleChargerFault(payload, assetInfo);
 
       await handleLowTemperatureRestrictedMovement(
+
         payload,
         assetInfo
       );
@@ -45,15 +46,19 @@ class AssetStatusBitsService {
         assetInfo
       );
 
+
       await handleMotorFaultTimeout(payload, assetInfo);
 
       await handleMotorCurrentHardwareFault(
+
         payload,
         assetInfo
       );
 
       if (assetInfo.is_status_bits_notify) {
+
         await handleEmergencyStop(payload, assetInfo);
+
       } else {
         console.log("SITE Notification Disabled");
       }
@@ -86,7 +91,9 @@ class AssetStatusBitsService {
     assetInfo.location_lng = data.location_lng;
     assetInfo.asset_name = data.asset_name;
     assetInfo.project_name = data.project_name;
+
     assetInfo.project_id = data.project_id;
+
     assetInfo.project_location = data.project_location;
     assetInfo.status_bits = data.asset_status_bits;
 
@@ -111,12 +118,14 @@ class AssetStatusBitsService {
     return arr;
   }
 
+
   async handleBits(payload, assetInfo) {
     console.log("handleLowBatteryAutoStow");
     const statusBitsList = this.getStatusBit(payload.status_bits);
     let promises = [];
     statusBitsList.forEach(async item => {
       promises.push(this.processLocalError(payload, assetInfo, item));
+
     });
 
     Promise.all(promises)
@@ -127,28 +136,34 @@ class AssetStatusBitsService {
         console.log("ALERT: ", excep);
       });
     //check already alert generated
+
     const checkAlert = await this.getActiveAlert(payload, assetInfo, bit);
+
     try {
       if (containsLowBatteryStow(statusBitsList)) {
         //check already alert generated
         //if not add new alert else ignore
         if (checkAlert.rows.length === 0) {
           //add new alert
+
           await addAlert(payload, assetInfo, bit);
           //add event log
           await addEventLog(payload, assetInfo, bit);
+
         }
       } else {
         //if created flag inactive it
         if (checkAlert.rows.length > 0) {
           //flag it inactive
           await clearAlert(payload, checkAlert.rows[0].id);
+
         }
       }
     } catch (exception) {
       console.log("Exception in LowBatteryStow ", exception);
     }
   }
+
 
   async getActiveAlert(payload, assetInfo, bit) {
     return await exeQuery(checkAlertQuery, [
@@ -161,6 +176,7 @@ class AssetStatusBitsService {
   async processLocalError(payload, assetInfo, bit) {
     //check alert
     const checkAlert = await this.getActiveAlert(payload, assetInfo, bit);
+
     if (checkAlert) {
     }
   }
