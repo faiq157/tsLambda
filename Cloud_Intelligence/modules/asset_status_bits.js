@@ -1331,7 +1331,7 @@ exports.handleAssetStatusBits = async function (payload) {
     // Get accounts related to the site and notification type
     const {
       emails: emailAddrs, phone_nums: phoneNumbers, admin_emails: adminEmails, admin_phone_nums: adminPhoneNumbers,
-    } = await notificationSettingService.getAccounts(client, assetInfo.site_id, notificationtype);
+    } = await notificationSettingService.getAccounts(assetInfo.site_id, notificationtype);
 
     // Merge account information into asset info
     Object.assign(assetInfo, { emailAddrs, phoneNumbers, adminEmails, adminPhoneNumbers });

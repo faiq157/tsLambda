@@ -129,10 +129,16 @@ if (process.env.DB_READ_HOST) {
 
 function getPool(query) {
   if (readerPool) {
-    const regex = new RegExp("^[\\s]*select", "i");
-    const isRead = regex.test(query);
-    if (isRead)
+    // Normalize query by removing leading whitespace and comments
+    const normalizedQuery = query.trim().replace(/^--.*$/gm, '').replace(/^\/\*[\s\S]*?\*\//gm, '').trim();
+    
+    // Check for read-only queries (SELECT, WITH, SHOW, EXPLAIN, etc.)
+    const readRegex = /^(select|with|show|explain|describe|desc)\s/i;
+    const isRead = readRegex.test(normalizedQuery);
+    
+    if (isRead) {
       return readerPool;
+    }
     return writerPool;
   } else {
     return writerPool;
@@ -292,7 +298,6 @@ FROM terrasmart.asset
 }
 
 module.exports.getAssetInfoBySnapAddr = (
-  client,
   snapAddr
 ) => {
   const query = `
@@ -308,10 +313,9 @@ module.exports.getAssetInfoBySnapAddr = (
   LEFT JOIN terrasmart.project on project.id = site.project_id
   LEFT JOIN terrasmart.site_layout on site_layout.asset_id = child_asset.id
   WHERE child_asset.snap_addr = $1 :: VARCHAR`;
-  return client.query(query, [snapAddr]);
+  return exeQuery(query, [snapAddr]);
 }
 module.exports.getSiteModeByNCId = (
-  client,
   ncId
 ) => {
   const query = `
@@ -319,7 +323,7 @@ module.exports.getSiteModeByNCId = (
   last_commanded_state, last_commanded_state_detail, last_commanded_state_changed_at
   FROM terrasmart.network_controller
   WHERE id = $1::UUID`;
-  return client.query(query, [ncId]);
+  return exeQuery(query, [ncId]);
 
 }
 module.exports.getAssetInfoById = (
@@ -504,7 +508,7 @@ module.exports.getCloudAlertSiteModeHistWithOptMode = (
 
 module.exports.updateCloudAlertSiteModeHist = (id) => {
   const query = `UPDATE terrasmart.cloud_alert_site_mode_hist SET is_changed = true WHERE id = $1::UUID`
-  return exeQuery(query, [id]);
+  return exeQuery(query, [id], { writer: true });
 }
 
 module.exports.getCloudSiteModeHist = (
@@ -539,7 +543,7 @@ module.exports.updateWeatherForecastStow = async (siteId, stowType, args) => {
   let { query, values } = getKeysAndValues(args, "update");
   values = [...values, siteId, stowType];
   const q = `UPDATE terrasmart.weather_forecast_stow SET ${query} WHERE site_id=$${values.length -1} AND stow_type = $${values.length} RETURNING *`;
-  return exeQuery(q, values);
+  return exeQuery(q, values, { writer: true });
 };
 
 module.exports.getCloudSiteModeHistWithOptMode = (
@@ -561,7 +565,7 @@ module.exports.getCloudSiteModeHistWithOptMode = (
 
 module.exports.updateCloudSiteModeHist = (id) => {
   const query = `UPDATE terrasmart.cloud_site_mode_hist SET is_changed = true WHERE id = $1::UUID`
-  return exeQuery(query, [id]);
+  return exeQuery(query, [id], { writer: true });
 }
 module.exports.addCloudEventLogWithUserInfo = (
   assetId,
@@ -591,7 +595,7 @@ module.exports.addCloudEventLogWithUserInfo = (
     icon,
     userName,
     email
-  ]);
+  ], { writer: true });
 }
 
 module.exports.addCloudEventLog = (
@@ -619,7 +623,7 @@ module.exports.addCloudEventLog = (
     title,
     icon,
     params ? JSON.stringify(params) : null
-  ]);
+  ], { writer: true });
 }
 
 module.exports.addCloudEventLogDetail = (             
@@ -648,7 +652,7 @@ module.exports.addCloudEventLogDetail = (
     logId,
     params ? JSON.stringify(params) : null
   ]);
-  return client.query(query, [
+  return exeQuery(query, [
     eventName,
     levelno,
     timestamp,
@@ -658,7 +662,7 @@ module.exports.addCloudEventLogDetail = (
     icon,
     logId,
     params ? JSON.stringify(params) : null
-  ]);
+  ], { writer: true });
 }
 module.exports.addFullCloudEventLog = (
   assetId,
@@ -677,7 +681,7 @@ module.exports.addFullCloudEventLog = (
   INSERT INTO terrasmart.cloud_event_log (name,message,levelno,created,asset_id,type,title,icon,user_name,user_email,params)
   VALUES ($1 :: VARCHAR, $2 :: TEXT, $3 :: INT, $4 :: TIMESTAMP,$5 :: UUID, $6::INT,$7::VARCHAR,$8::VARCHAR,$9::VARCHAR,$10::VARCHAR,$11::JSON)
   `;
-  return exeQuery(query, [eventName, eventMessage, levelno, timestamp, assetId, eventType, eventTitle, eventIcon, userName, userEmail, params ? JSON.stringify(params) : null]);
+  return exeQuery(query, [eventName, eventMessage, levelno, timestamp, assetId, eventType, eventTitle, eventIcon, userName, userEmail, params ? JSON.stringify(params) : null], { writer: true });
 }
 
 module.exports.addCloudAlertWithUserInfo = (
@@ -713,15 +717,15 @@ SELECT id FROM cloud_alert_insert`;
     email,
     params ? JSON.stringify(params) : null,
     levelNo
-  ]);
+  ], { writer: true });
 }
-module.exports.getCloudAlert = (client, assetId, eventName) => {
+module.exports.getCloudAlert = (assetId, eventName) => {
   const query = `
   SELECT cloud_alert.* FROM terrasmart.cloud_alert
   WHERE asset_id = $1 :: UUID AND event_name = $2 :: VARCHAR AND cloud_alert.active = true`;
-  return client.query(query, [assetId, eventName]);
+  return exeQuery(query, [assetId, eventName]);
 }
-module.exports.getActiveAlertsForAllAssets = (client, nc_asset_id) => {
+module.exports.getActiveAlertsForAllAssets = (nc_asset_id) => {
   const query = ` SELECT cloud_alert.id,
   cloud_alert.asset_id,
   cloud_alert.created,
@@ -758,7 +762,7 @@ cloud_alert.active = true AND (cloud_alert.asset_id in (
     AND cloud_alert.event_name != 'VEGETATION-ALERT'
     AND cloud_alert.event_name != 'SNOW_SHEDDING_DELAY'
     ORDER BY cloud_alert.created DESC;`;
-  return client.query(query, [nc_asset_id]);
+  return exeQuery(query, [nc_asset_id]);
 }
 
 module.exports.getProjectDetailsBySiteId = (siteId) => {
@@ -827,7 +831,7 @@ module.exports.addCloudAlert = (
     message,
     levelno,
     params ? JSON.stringify(params) : null
-  ]);
+  ], { writer: true });
 };
 
 module.exports.getCloudAlertDetailByAlertId = (cloudAlertId) => {
@@ -835,15 +839,15 @@ module.exports.getCloudAlertDetailByAlertId = (cloudAlertId) => {
   return exeQuery(query, [cloudAlertId])
 }
 
-module.exports.removeCloudAlertDetail = (client, alertId) => {
+module.exports.removeCloudAlertDetail = (alertId) => {
   const query = `
       Delete from terrasmart.cloud_alert_detail
       WHERE cloud_alert_detail.cloud_alert_id = $1::UUID`;
 
-  return client.query(query, [alertId]);
+  return exeQuery(query, [alertId], { writer: true });
 };
 
-module.exports.removeCloudAlert = (client, alertId) => {
+module.exports.removeCloudAlert = (alertId) => {
   const query = `DELETE FROM terrasmart.cloud_alert WHERE id = $1::UUID`;
-  return client.query(query, [alertId]);
+  return exeQuery(query, [alertId], { writer: true });
 };

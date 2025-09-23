@@ -1,4 +1,5 @@
 const db = require("../../db")
+const { exeQuery } = require("../../pg")
 /**
  * Returns the true/false if event is grouped or not
  * @param {event_name} event_name to verify if exisits
@@ -49,17 +50,17 @@ exports.getAssetNameById = (assetsInfo, asset_id) => {
  * @param {client} client databse client to execute query
  * @param {network_controller_id} network_controller_id for which we need to get info from database
  */
-exports.getAssetsInfoByNetworkControllerId = async (client, network_controller_id) => {
+exports.getAssetsInfoByNetworkControllerId = async (network_controller_id) => {
   try {
     let assetsInfo = [];
     console.log(db.ncInfoById, [network_controller_id]);
 
-    const getNc = await client.query(db.ncInfoById, [network_controller_id]);
+    const getNc = await exeQuery(db.ncInfoById, [network_controller_id]);
     console.log(getNc);
 
     if (getNc.rows.length !== 0) {
       console.log(db.assetInfoByNcIdQuery, [getNc.rows[0].id]);
-      const getAssets = await client.query(
+      const getAssets = await exeQuery(
         db.assetInfoByNcIdQuery, [getNc.rows[0].id]);
 
       // console.log("getAssets ",getAssets);
@@ -92,10 +93,10 @@ exports.getAssetsInfoByNetworkControllerId = async (client, network_controller_i
  * @param {assetsWithActiveAlerts} assetsWithActiveAlerts contains assets Info which have active alerts
  * @param {network_controller_id} network_controller_id for which we need to get info from database
  */
-exports.getGroupedEvents = async (client, assetsWithActiveAlerts, network_controller_id) => {
+exports.getGroupedEvents = async (assetsWithActiveAlerts, network_controller_id) => {
   try {
     let infoMap = [];
-    const assetsInfo = await this.getAssetsInfoByNetworkControllerId(client, network_controller_id);
+    const assetsInfo = await this.getAssetsInfoByNetworkControllerId(network_controller_id);
     // console.log("assetsInfo",assetsInfo);
     await assetsWithActiveAlerts.rows.forEach(async (data) => {
       if (this.isGroupedEvent(data.event_name)) {

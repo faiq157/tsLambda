@@ -1,18 +1,17 @@
 const pg = require("../pg");
 
-const getCloudSiteModeHist = (client, networkControllerId) => {
-    return pg.getCloudSiteModeHist(client, networkControllerId);
+const getCloudSiteModeHist = (networkControllerId) => {
+    return pg.getCloudSiteModeHist(networkControllerId);
 
 }
 
-const getCloudSiteModeHistWithOptMode = (client, networkControllerId, cmdStateDetail) => {
-    return pg.getCloudSiteModeHistWithOptMode(client, networkControllerId, cmdStateDetail);
+const getCloudSiteModeHistWithOptMode = (networkControllerId, cmdStateDetail) => {
+    return pg.getCloudSiteModeHistWithOptMode(networkControllerId, cmdStateDetail);
 
 }
 
-const updateCloudSiteModeHist = async (client, id) => {
-    const { rows, rowCount } = await pg.updateCloudSiteModeHist(
-        client, id);
+const updateCloudSiteModeHist = async (id) => {
+    const { rows, rowCount } = await pg.updateCloudSiteModeHist(id);
     if (rowCount > 0) {
         return rowCount;
     }

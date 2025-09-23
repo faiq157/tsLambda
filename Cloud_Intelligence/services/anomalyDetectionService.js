@@ -149,7 +149,6 @@ class AnomalyDetectionService {
 
         if (this.payload.detection_type === "poc_wakeup") {
           await CloudAlertsHelperModel.addAnomalyPocWakeupClearAlert(
-            this.pgWrite,
             leaderInfo,
             childInfo,
             true,
@@ -160,7 +159,6 @@ class AnomalyDetectionService {
           );
         } else if (this.payload.detection_type === "poc_nighttime_stow") {
           await CloudAlertsHelperModel.addAnomalyPocNighttimeStowClearAlert(
-            this.pgWrite,
             leaderInfo,
             childInfo,
             true,
@@ -171,7 +169,6 @@ class AnomalyDetectionService {
           );
         } else if (this.payload.detection_type === "current_angle") {
           await CloudAlertsHelperModel.addAnomalyCurrentAngleClearAlert(
-            this.pgWrite,
             leaderInfo,
             childInfo,
             true,
@@ -269,7 +266,6 @@ class AnomalyDetectionService {
 
         if (this.payload.detection_type === "poc_wakeup") {
           await CloudAlertsHelperModel.addAnomalyPocWakeupAlert(
-            this.pgWrite,
             leaderInfo,
             childInfo,
             true,
@@ -280,7 +276,6 @@ class AnomalyDetectionService {
           );
         } else if (this.payload.detection_type === "poc_nighttime_stow") {
           await CloudAlertsHelperModel.addAnomalyPocNighttimeStowAlert(
-            this.pgWrite,
             leaderInfo,
             childInfo,
             true,
@@ -292,7 +287,6 @@ class AnomalyDetectionService {
         }
         else if (this.payload.detection_type === "current_angle") {
           await CloudAlertsHelperModel.addAnomalyCurrentAngleAlert(
-            this.pgWrite,
             leaderInfo,
             childInfo,
             true,

@@ -3,14 +3,15 @@ const moment = require("moment-timezone");
 const tzlookup = require("tz-lookup");
 const fs = require("fs");
 const db = require("../db");
+const { exeQuery } = require("../pg");
 var Handlebars = require("handlebars");
 const { notificationSettingService } = require("../services/notificationSettingService");
 const utils = require("../utils");
 const {getS3EmailAssetsUrl} = require("../utils/libs/functions");
 
-exports.handleNCHist = async function (client, payload) {
+exports.handleNCHist = async function (payload) {
   console.log("network_controller_connection_hist ", payload);
-  const network_controller_info = await client.query(db.ncInfo, [
+  const network_controller_info = await exeQuery(db.ncInfo, [
     payload.network_controller_id,
   ]);
   let info = {};
@@ -30,7 +31,6 @@ exports.handleNCHist = async function (client, payload) {
   });
   if (is_notify_nc_stauts) {
     var userAccounts = await notificationSettingService.getAccounts(
-      client,
       info.site_id,
       "nc_status"
     );

@@ -3,24 +3,24 @@ const { getActiveWeatherForecastStowBySiteId, updateWeatherForecastStow, getWeat
 
 class WeatherForecastStowModel {
 
-  async getActiveWeatherForecastStowBySiteId (pgClinet, siteId, stowType, active) {
-    const { rows } = await getActiveWeatherForecastStowBySiteId(pgClinet, siteId, stowType, active);
+  async getActiveWeatherForecastStowBySiteId (siteId, stowType, active) {
+    const { rows } = await getActiveWeatherForecastStowBySiteId(siteId, stowType, active);
     if (rows?.length > 0) {
       return rows[0];
     }
     return null;
   }
 
-  async updateWeatherForecastStow (pgWrite, siteId, stowType, args) {
-    const {rows} = await updateWeatherForecastStow(pgWrite, siteId, stowType, args);
+  async updateWeatherForecastStow (siteId, stowType, args) {
+    const {rows} = await updateWeatherForecastStow(siteId, stowType, args);
     if (rows?.length > 0) {
       return rows[0];
     }
     return null;
   }
 
-  async getWeatherCurrentConditionsByProjectID(pgClient, projectId) {
-    const { rows } = await getWeatherCurrentConditionsByProjectID(pgClient, projectId);
+  async getWeatherCurrentConditionsByProjectID(projectId) {
+    const { rows } = await getWeatherCurrentConditionsByProjectID(projectId);
     if (rows?.length > 0) {
       return rows[0];
     }

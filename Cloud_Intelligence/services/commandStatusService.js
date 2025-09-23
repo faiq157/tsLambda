@@ -109,7 +109,6 @@ class CommandStatusService {
               projectLocation: assetInfo?.project_location,
             };
             await CloudAlertsHelperModel.addManualControlAlert(
-              this.pgWrite,
               leaderInfo,
               childInfo,
               commandInfo.status,
@@ -224,7 +223,6 @@ class CommandStatusService {
               };
 
               await CloudAlertsHelperModel.addManualControlAlert(
-                this.pgWrite,
                 leaderInfo,
                 childInfo,
                 commandInfo.status,

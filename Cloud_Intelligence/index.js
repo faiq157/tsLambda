@@ -1,4 +1,4 @@
-const { Client, types } = require("pg");
+const { types } = require("pg");
 const { pgConfig, pgMasterConfig } = require("./pg");
 const utils = require("./utils");
 const helper = require("./Helper");
@@ -79,7 +79,7 @@ const processElasticSearchData = async (payload) => {
         }
         break;
       case "network_controller_connection_hist":
-        await nCConhist.handleNCHist(client, payload);
+        await nCConhist.handleNCHist(payload);
         break;
       case "asset_connection_hist":
         //Send raw data to ES
@@ -104,12 +104,12 @@ const processElasticSearchData = async (payload) => {
         await ncSleepEvent.handleUpdate(payload);
         break;
       case "weather_stow_updates":
-        if (await checkActiveAsset(client, payload)) {
+        if (await checkActiveAsset(payload)) {
           await weatherStowService.handler(payload);
         }
         break;
       case "network_controller_reboot_event":
-        await ncRebootEvent.handleNCRebootUpdate(client, pgWrite, payload);
+        await ncRebootEvent.handleNCRebootUpdate(payload);
         console.log("END network_controller_reboot_event");
         break;
       case "local_weather_hourly_alarms":
@@ -140,12 +140,12 @@ const processElasticSearchData = async (payload) => {
         break;
       case "asset_preset_update":
         console.log("Processing asset_preset_update with payload..!", payload);
-        if (await checkActiveAsset(client, payload)) {
-          await assetPresetService.handler(client, pgWrite, payload);
+        if (await checkActiveAsset(payload)) {
+          await assetPresetService.handler(payload);
         }
         break;
       case "qc_update":
-        await remoteQCReportService.handler(client, pgWrite, payload);
+        await remoteQCReportService.handler(payload);
         break;
       case "snow_shedding_report":
         await snowSheddingReportService.handler(payload);
@@ -154,7 +154,7 @@ const processElasticSearchData = async (payload) => {
         await snowSheddingService.handler(payload);
         break;
       case "increase_weather_reporting_update":
-        await increaseWeatherReportingService.handler(client, pgWrite, payload);
+        await increaseWeatherReportingService.handler(payload);
         break;
       default:
         console.log(payload.channel, "No case handled for the channel");

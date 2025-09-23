@@ -1,7 +1,7 @@
 const pg = require("../pg");
 
-const getSiteModeInfo = async (client, ncId) => {
-    const { rows } = await pg.getSiteModeByNCId(client, ncId);
+const getSiteModeInfo = async (ncId) => {
+    const { rows } = await pg.getSiteModeByNCId(ncId);
     if (rows.length > 0) {
         return rows[0];
     }

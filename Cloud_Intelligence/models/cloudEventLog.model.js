@@ -1,7 +1,7 @@
 const pg = require("../pg");
 
-const getTimelineEventByEventNameAndTime = async (client, assetId, eventName, timestamp) => {
-  const { rows } = await pg.getCloudEventByNameAndTime(client, assetId, eventName, timestamp);
+const getTimelineEventByEventNameAndTime = async (assetId, eventName, timestamp) => {
+  const { rows } = await pg.getCloudEventByNameAndTime(assetId, eventName, timestamp);
   if (rows.length > 0) {
     return rows[0];
   }
@@ -9,8 +9,8 @@ const getTimelineEventByEventNameAndTime = async (client, assetId, eventName, ti
   console.warn('No cloud event log found for :', JSON.stringify({ assetId, eventName, timestamp }));
   return null;
 }
-const addCloudEventLogWithUserInfo = async (client, assetId, eventName, timestamp, title, icon, userName, email, levelNo = 20) => {
-  const { rows } = await pg.addCloudEventLogWithUserInfo(client, assetId, eventName, timestamp, title, icon, userName, email, levelNo);
+const addCloudEventLogWithUserInfo = async (assetId, eventName, timestamp, title, icon, userName, email, levelNo = 20) => {
+  const { rows } = await pg.addCloudEventLogWithUserInfo(assetId, eventName, timestamp, title, icon, userName, email, levelNo);
   if (rows.length > 0) {
     return rows[0];
   }
@@ -31,10 +31,10 @@ const addCloudEventLog = async (assetId, eventName, timestamp, title, icon, para
 }
 
 
-const addCloudEventLogDetail = async (client, assetId, eventName, timestamp, title, icon,
+const addCloudEventLogDetail = async (assetId, eventName, timestamp, title, icon,
   type, levelno, logId, params) => {
 
-  const { rowCount } = await pg.addCloudEventLogDetail(client, assetId, eventName, timestamp, title, icon,
+  const { rowCount } = await pg.addCloudEventLogDetail(assetId, eventName, timestamp, title, icon,
     type, levelno, logId, params);
   if (rowCount > 0) {
     return rowCount;

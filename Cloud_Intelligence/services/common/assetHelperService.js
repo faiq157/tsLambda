@@ -1,10 +1,11 @@
 const db = require("../../db");
+const { exeQuery } = require("../../pg");
 
 class AssetHelperService {
 
-    async checkIsActive(client, asset_id) {
+    async checkIsActive(asset_id) {
         console.log(db.checkActiveAssetQuery, [asset_id]);
-        const getActiveAsset = await client.query(db.checkActiveAssetQuery, [asset_id]);
+        const getActiveAsset = await exeQuery(db.checkActiveAssetQuery, [asset_id]);
         console.log(getActiveAsset.rows);
         if (getActiveAsset.rows.length === 0) {
             return false;

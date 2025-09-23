@@ -112,7 +112,6 @@ class AssetPresetService {
             //add alert
             if (isLinkedRow(linkRowType, linkRowRef, device_type)) {
               await CloudAlertsHelperModel.addManualControlAlert(
-                this.pgWrite,
                 leaderInfo,
                 childInfo,
                 commandInfo.status,

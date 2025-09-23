@@ -1,7 +1,7 @@
 const pg = require("../pg");
 
-const getActiveAlert = async (client, snapAddr, eventName) => {
-    const { rows } = await pg.getActiveAlert(client, snapAddr, eventName);
+const getActiveAlert = async (snapAddr, eventName) => {
+    const { rows } = await pg.getActiveAlert(snapAddr, eventName);
     if (rows.length > 0) {
         return rows[0];
     }
@@ -61,8 +61,8 @@ const getActiveAlertsForAllAssets = (ncAssetId) => {
 
 
 
-const getAlertSiteModeByUser = async (client, snapAddr, eventName) => {
-    const { rows } = await pg.getActiveAlert(client, snapAddr, eventName);
+const getAlertSiteModeByUser = async (snapAddr, eventName) => {
+    const { rows } = await pg.getActiveAlert(snapAddr, eventName);
     if (rows.length > 0) {
         return rows[0];
     }

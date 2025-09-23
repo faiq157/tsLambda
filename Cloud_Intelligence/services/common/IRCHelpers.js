@@ -1,12 +1,13 @@
 const { getAssetInfo, isLastActionCompleted } = require("./IRCHelpers.db");
+const { exeQuery } = require("../../pg");
 
 /**
  * Returns true if the last command issued to asset was start IRC, and not stop IRC
  * @param {Object} client PG client to query the database
  * @param {String} assetId Asset ID of the asset, for which the status is to be found
  */
-exports.checkIsInIRC = async (client, assetId) => {
-  let res = await client.query(getAssetInfo(), [assetId]);
+exports.checkIsInIRC = async (assetId) => {
+  let res = await exeQuery(getAssetInfo(), [assetId]);
 
   console.log("RES checkIsInIRC: ", res);
   let returnVal = null;
@@ -31,8 +32,8 @@ exports.checkIsInIRC = async (client, assetId) => {
  * @param {Object} client PG client to query the database
  * @param {String} assetId Asset ID of the asset, for which the status is to be found
  */
-exports.getCommandInfo = async (client, assetId) => {
-  let res = await client.query(isLastActionCompleted(), [assetId]);
+exports.getCommandInfo = async (assetId) => {
+  let res = await exeQuery(isLastActionCompleted(), [assetId]);
   // console.log("RESULT: ", res);
 
   if (res.rows.length > 0) {

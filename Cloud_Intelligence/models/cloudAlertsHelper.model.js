@@ -317,7 +317,6 @@ class CloudAlertsHelperModel {
   }
 
   async addRowOfflineAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -333,8 +332,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, alertObj);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowAlert(alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -346,12 +345,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_STATUS,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addRowOnlineAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -367,7 +365,7 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -379,12 +377,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_STATUS,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addRowFcsAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -400,8 +397,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, alertObj);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowAlert(alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -413,12 +410,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_FCS,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addRowFasttrakAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -434,8 +430,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, alertObj);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowAlert(alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -447,12 +443,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_FASTTRAK,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addRowFasttrakStopAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -468,7 +463,7 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -480,12 +475,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_FASTTRAK,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addRowQCFasttrakAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -501,8 +495,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, alertObj);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowAlert(alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -514,11 +508,10 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_FASTTRAK,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
   async addRowQCFasttrakStopAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -534,7 +527,7 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -546,12 +539,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_FASTTRAK,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addManualControlAlert(
-    client,
     leaderinfo,
     followerinfo,
     status,
@@ -571,8 +563,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions.created ? notificationOptions.created : new Date()
     }
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, alertObj);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowAlert(alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -584,12 +576,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_MANUAL_CONTROL,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addManualControlStopAlert(
-    client,
     leaderinfo,
     followerinfo,
     status,
@@ -609,7 +600,7 @@ class CloudAlertsHelperModel {
       created: notificationOptions.created ? notificationOptions.created : new Date()
     }
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -621,12 +612,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_MANUAL_CONTROL,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addRemoteqcStartAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -643,8 +633,8 @@ class CloudAlertsHelperModel {
       levelNo: 30
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, alertObj);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowAlert(alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -656,11 +646,10 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_REMOTE_QC,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
   async addRemoteqcStopAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -677,7 +666,7 @@ class CloudAlertsHelperModel {
       levelNo: 30
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -689,12 +678,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_REMOTE_QC,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addEstopEngageAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -711,8 +699,8 @@ class CloudAlertsHelperModel {
     };
 
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, alertObj);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowAlert(alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -724,12 +712,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_ESTOP,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addEstopDisengageAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -746,7 +733,7 @@ class CloudAlertsHelperModel {
     };
 
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -758,12 +745,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_ESTOP,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addMotorCurrentHardwareFaultAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -779,8 +765,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, {...alertObj, levelNo: 30});
-    await this.addRowEventlog(client, {...alertObj, levelNo: 30});
+    await this.addRowAlert({...alertObj, levelNo: 30});
+    await this.addRowEventlog({...alertObj, levelNo: 30});
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -792,12 +778,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_LOCAL_STATUS_BITS,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addMotorCurrentSoftwareFaultAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -813,8 +798,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, {...alertObj, levelNo: 30});
-    await this.addRowEventlog(client, {...alertObj, levelNo: 30});
+    await this.addRowAlert({...alertObj, levelNo: 30});
+    await this.addRowEventlog({...alertObj, levelNo: 30});
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -826,12 +811,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_LOCAL_STATUS_BITS,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addLowTempRestrictedMovementAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -847,8 +831,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, alertObj);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowAlert(alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -860,12 +844,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_LOCAL_STATUS_BITS,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addLowBatteryStowAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -886,7 +869,7 @@ class CloudAlertsHelperModel {
     // check if the alert with the title and the asset id exists
     if (alertObj?.assetId && alertObj?.eventName) {
 
-      const existingAlert = await getActiveAlertByAssetId(client, alertObj?.assetId, alertOptions?.event);
+      const existingAlert = await getActiveAlertByAssetId(alertObj?.assetId, alertOptions?.event);
   
       if (existingAlert) {
         console.log("Info: (ignoring duplicate alert) Alert already exists", alertObj);
@@ -895,8 +878,8 @@ class CloudAlertsHelperModel {
 
     }
 
-    await this.addRowAlert(client, alertObj);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowAlert(alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -908,12 +891,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_LOCAL_STATUS_BITS,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addChargerFaultAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -930,8 +912,8 @@ class CloudAlertsHelperModel {
     };
 
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, alertObj);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowAlert(alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -943,12 +925,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_LOCAL_STATUS_BITS,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addMotorFaultTimeoutAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -964,8 +945,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, {...alertObj, levelNo: 30});
-    await this.addRowEventlog(client, {...alertObj, levelNo: 30});
+    await this.addRowAlert({...alertObj, levelNo: 30});
+    await this.addRowEventlog({...alertObj, levelNo: 30});
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -977,12 +958,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_LOCAL_STATUS_BITS,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addNoConnectionWithNCAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -998,8 +978,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, alertObj);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowAlert(alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -1011,7 +991,7 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ROW_LOCAL_STATUS_BITS,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
@@ -1090,7 +1070,6 @@ class CloudAlertsHelperModel {
   }
 
   async addMLIssuePocAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -1108,8 +1087,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, alertObj);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowAlert(alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -1121,12 +1100,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ML_ROW_BATTERY_ANALYSIS,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addMLIssueClearedPocAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -1146,8 +1124,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    // await this.addRowAlert(client, alertObj); NO ALERT FOR THIS CASE
-    await this.addRowEventlog(client, alertObj);
+    // await this.addRowAlert(alertObj); NO ALERT FOR THIS CASE
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -1159,12 +1137,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ML_ROW_BATTERY_ANALYSIS,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addMLIssueCurrentAngleAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -1182,8 +1159,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, alertObj);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowAlert(alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -1195,12 +1172,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ML_ROW_TRACKING,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addMLIssueClearedCurrentAngleAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -1220,8 +1196,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    // await this.addRowAlert(client, alertObj); NO ALERT FOR THIS CASE
-    await this.addRowEventlog(client, alertObj);
+    // await this.addRowAlert(alertObj); NO ALERT FOR THIS CASE
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -1233,12 +1209,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ML_ROW_TRACKING,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addAnomalyPocWakeupAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -1260,8 +1235,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, alertObj);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowAlert(alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -1273,12 +1248,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ANOMALY_ROW_AM_BATTERY_ANALYSIS,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addAnomalyPocWakeupClearAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -1300,7 +1274,7 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -1312,12 +1286,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ANOMALY_ROW_AM_BATTERY_ANALYSIS,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addAnomalyPocNighttimeStowAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -1339,8 +1312,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, alertObj);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowAlert(alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -1352,12 +1325,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ANOMALY_ROW_PM_BATTERY_ANALYSIS,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addAnomalyPocNighttimeStowClearAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -1379,7 +1351,7 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -1391,12 +1363,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ANOMALY_ROW_PM_BATTERY_ANALYSIS,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addAnomalyCurrentAngleAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -1414,8 +1385,8 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowAlert(client, alertObj);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowAlert(alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -1427,12 +1398,11 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ANOMALY_ROW_TRACKING,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 
   async addAnomalyCurrentAngleClearAlert(
-    client,
     leaderinfo,
     followerinfo,
     isLinked = false,
@@ -1450,7 +1420,7 @@ class CloudAlertsHelperModel {
       created: notificationOptions?.created
     };
     const alertObj = this.createAlertObject(alertOptions);
-    await this.addRowEventlog(client, alertObj);
+    await this.addRowEventlog(alertObj);
 
     const { isNotify } = notificationOptions;
     if (isNotify) {
@@ -1462,7 +1432,7 @@ class CloudAlertsHelperModel {
           notificationType: NotificationTypes.ANOMALY_ROW_TRACKING,
         }
       );
-      await this.sendNotification(client, notificationPayload);
+      await this.sendNotification(notificationPayload);
     }
   }
 }

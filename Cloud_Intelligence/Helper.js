@@ -1,23 +1,24 @@
 const db = require("./db");
+const { exeQuery } = require("./pg");
 
 exports.esHelper = (payload) => {
   let info = payload;
   info.timestamp = payload.last_asset_updated;
   return info;
 }
-exports.getFirmwareVersion = async (client, payload) => {
+exports.getFirmwareVersion = async (payload) => {
   let result = { fwVersion: null, nc_asset_id: null };
   try {
     console.log("Getting info for Asset ...")
     console.log(db.ncInfoByAssetId, [payload.asset_id]);
-    let res = await client.query(db.ncInfoByAssetId, [payload.asset_id]);
+    let res = await exeQuery(db.ncInfoByAssetId, [payload.asset_id]);
     console.log("Res ", res.rows);
     if (res.rows.length > 0) {
       fwVersion = parseFirmwareVersion(res.rows[0].fw_version);
       if (fwVersion === null) {
         console.log("Getting info for NC ...")
         console.log(db.ncInfoByNCAssetId, [payload.asset_id]);
-        res = await client.query(db.ncInfoByNCAssetId, [payload.asset_id]);
+        res = await exeQuery(db.ncInfoByNCAssetId, [payload.asset_id]);
         if (res.rows.length > 0) {
           result.fwVersion = parseFirmwareVersion(res.rows[0].fw_version);
           result.nc_asset_id = res.rows[0].network_controller_asset_id;
@@ -30,7 +31,7 @@ exports.getFirmwareVersion = async (client, payload) => {
     } else {
       console.log("Getting info for NC1 ...")
       console.log(db.ncInfoByNCAssetId, [payload.asset_id]);
-      res = await client.query(db.ncInfoByNCAssetId, [payload.asset_id]);
+      res = await exeQuery(db.ncInfoByNCAssetId, [payload.asset_id]);
       if (res.rows.length > 0) {
         result.fwVersion = parseFirmwareVersion(res.rows[0].fw_version);
         result.nc_asset_id = res.rows[0].network_controller_asset_id;

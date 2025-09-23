@@ -1,7 +1,7 @@
 const pg = require("../pg");
 
-const getAssetBySnapAddr = async (client, snapAddr) => {
-    const { rows } = await pg.getAssetInfoBySnapAddr(client, snapAddr);
+const getAssetBySnapAddr = async (snapAddr) => {
+    const { rows } = await pg.getAssetInfoBySnapAddr(snapAddr);
     if (rows.length > 0) {
         return rows[0];
     }

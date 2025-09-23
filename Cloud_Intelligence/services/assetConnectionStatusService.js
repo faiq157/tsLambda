@@ -120,7 +120,6 @@ class AssetConnectionHistService {
 
           if (isLinkedRow(linkRowType, linkRowRef,  device_type)) {
            await CloudAlertsHelperModel.addRowOfflineAlert(
-            this.pgWrite,
              leaderInfo,
              childInfo,
              true,
@@ -199,7 +198,6 @@ class AssetConnectionHistService {
                 }
 
                 await CloudAlertsHelperModel.addManualControlStopAlert(
-                this.pgWrite,
                   leaderInfo,
                   childInfo,
                   commandInfo.lastStatus,
@@ -309,7 +307,6 @@ class AssetConnectionHistService {
               }
 
               await CloudAlertsHelperModel.addRowFasttrakStopAlert(
-              this.pgWrite,
                 leaderInfo,
                 childInfo,
                 true,
@@ -372,7 +369,6 @@ class AssetConnectionHistService {
               }
 
               await CloudAlertsHelperModel.addRowQCFasttrakStopAlert(
-              this.pgWrite,
                 leaderInfo,
                 childInfo,
                 true,
@@ -443,7 +439,6 @@ class AssetConnectionHistService {
                 }
 
                 await CloudAlertsHelperModel.addRowOnlineAlert(
-                this.pgWrite,
                   leaderInfo,
                   childInfo,
                   true,
@@ -502,7 +497,6 @@ class AssetConnectionHistService {
           let title = await this.getTitle(assetInfo, "FCS");
           if (isLinkedRow(linkRowType, linkRowRef, device_type)) {
             await CloudAlertsHelperModel.addRowFcsAlert(
-              this.pgWrite,
               leaderInfo,
               childInfo,
               true,
@@ -570,7 +564,6 @@ class AssetConnectionHistService {
 
           if (isLinkedRow(linkRowType, linkRowRef, device_type)) {
             await CloudAlertsHelperModel.addRowFasttrakAlert(
-              this.pgWrite,
               leaderInfo,
               childInfo,
               true,
@@ -636,7 +629,6 @@ class AssetConnectionHistService {
 
          if (isLinkedRow(linkRowType, linkRowRef, device_type)) {
             await CloudAlertsHelperModel.addRowQCFasttrakAlert(
-              this.pgWrite,
               leaderInfo,
               childInfo,
               true,
@@ -744,7 +736,6 @@ class AssetConnectionHistService {
               }
 
               await CloudAlertsHelperModel.addRowFasttrakStopAlert(
-              this.pgWrite,
                 leaderInfo,
                 childInfo,
                 true,
@@ -916,7 +907,6 @@ class AssetConnectionHistService {
               }
 
               await CloudAlertsHelperModel.addRowOnlineAlert(
-              this.pgWrite,
                 leaderInfo,
                 childInfo,
                 true,

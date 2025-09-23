@@ -186,7 +186,7 @@ exports.handleWeatherStowUpdates = async function (payload) {
             message,
             new Date(payload.timestamp),
             payload.asset_id,
-          ]);
+          ], { writer: true });
         } else {
           //Add cloud event log
           let addcloudEventLogResult = await exeQuery(cloudEventLogQuery, [
@@ -328,7 +328,7 @@ exports.handleWeatherStowUpdates = async function (payload) {
             messageAvgWind,
             new Date(payload.timestamp),
             payload.asset_id,
-          ]);
+          ], { writer: true });
         } else {
           //Add cloud event log
           let addcloudEventLogResult = await exeQuery(cloudEventLogQuery, [
@@ -471,7 +471,7 @@ exports.handleWeatherStowUpdates = async function (payload) {
             messageDeepSnow,
             new Date(payload.timestamp),
             payload.asset_id,
-          ]);
+          ], { writer: true });
         } else {
           //Add cloud event log
           let addcloudEventLogResult = await exeQuery(cloudEventLogQuery, [
@@ -603,7 +603,7 @@ exports.handleWeatherStowUpdates = async function (payload) {
             messageDeepPanelSnow,
             new Date(payload.timestamp),
             payload.asset_id,
-          ]);
+          ], { writer: true });
         } else {
           //Add cloud event log
           let addcloudEventLogResult = await exeQuery(cloudEventLogQuery, [
@@ -741,7 +741,7 @@ exports.handleWeatherStowUpdates = async function (payload) {
             messageNoWeatherStation,
             new Date(payload.timestamp),
             payload.asset_id,
-          ]);
+          ], { writer: true });
         } else {
           //Add cloud event log
           let addcloudEventLogResult = await exeQuery(cloudEventLogQuery, [

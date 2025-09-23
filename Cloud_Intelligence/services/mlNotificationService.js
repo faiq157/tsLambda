@@ -178,7 +178,6 @@ class MLNotificationService {
 
       if (this.payload.ml_type === "poc") {
         await CloudAlertsHelperModel.addMLIssueClearedPocAlert(
-          this.pgWrite,
           leaderInfo,
           childInfo,
           true,
@@ -188,7 +187,6 @@ class MLNotificationService {
         );
       } else if (this.payload.ml_type === "current_angle") {
         await CloudAlertsHelperModel.addMLIssueClearedCurrentAngleAlert(
-          this.pgWrite,
           leaderInfo,
           childInfo,
           true,
@@ -213,8 +211,8 @@ class MLNotificationService {
   async clearAlert(alertId) {
     try {
       console.log("Delete Cloud Alert: ", alertId);
-      await cloudAlertService.clearAlertDetail(this.pgWrite, alertId);
-      return removeCloudAlert(this.pgWrite, alertId);
+      await cloudAlertService.clearAlertDetail(alertId);
+      return removeCloudAlert(alertId);
     } catch (err) {
       throw new Error("Error In get clearAlert.. ", err);
     }
@@ -264,7 +262,6 @@ class MLNotificationService {
 
         if (this.payload.ml_type === "poc") {
           await CloudAlertsHelperModel.addMLIssuePocAlert(
-            this.pgWrite,
             leaderInfo,
             childInfo,
             true,
@@ -273,7 +270,6 @@ class MLNotificationService {
           );
         } else if (this.payload.ml_type === "current_angle") {
           await CloudAlertsHelperModel.addMLIssueCurrentAngleAlert(
-            this.pgWrite,
             leaderInfo,
             childInfo,
             true,
@@ -283,7 +279,6 @@ class MLNotificationService {
         }
       } else {
         return await addCloudAlert(
-          this.pgWrite,
           this.payload.asset_id,
           this.getEventNames(this.payload.ml_type, true),
           this.payload.timestamp,
@@ -325,7 +320,6 @@ class MLNotificationService {
   async addEventLog(eventTitle, assetName, snap_addr, isActive, info) {
     try {
       let addRes = await addFullCloudEventLog(
-        this.pgWrite,
         this.payload.asset_id,
         30,
         this.payload.timestamp,
